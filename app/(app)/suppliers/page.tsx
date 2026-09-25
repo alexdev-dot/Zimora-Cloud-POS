@@ -44,7 +44,6 @@ import {
 
 import { formatKES, uid } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
-import { getSuppliers, createSupplier, updateSupplier, deleteSupplier, subscribeToSuppliers, unsubscribeFromSuppliers } from "@/lib/api/suppliers";
 import type { Supplier } from "@/types";
 
 export default function SuppliersPage() {
@@ -53,38 +52,11 @@ export default function SuppliersPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [detail, setDetail] = React.useState<Supplier | null>(null);
   const [addOpen, setAddOpen] = React.useState(false);
-  const subscriptionRef = React.useRef<any>(null);
 
   // Fetch suppliers on mount
   React.useEffect(() => {
-    async function fetchSuppliers() {
-      try {
-        const data = await getSuppliers();
-        setRows(data);
-      } catch (error) {
-        console.error('Error fetching suppliers:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchSuppliers();
-
-    // Set up real-time subscription (separate from data fetch to avoid duplicate subscriptions)
-    if (!subscriptionRef.current) {
-      const channel = subscribeToSuppliers((updatedSuppliers) => {
-        setRows(updatedSuppliers);
-      });
-      subscriptionRef.current = channel;
-    }
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (subscriptionRef.current) {
-        unsubscribeFromSuppliers(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
+    setRows([]);
+    setIsLoading(false);
   }, []);
 
   const stats = React.useMemo(
@@ -302,18 +274,11 @@ export default function SuppliersPage() {
       <AddSupplierDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        onAdd={async (s) => {
-          try {
-            await createSupplier(s);
-            // Refresh list
-            const updated = await getSuppliers();
-            setRows(updated);
-            setAddOpen(false);
-            toast.success("Supplier added", { description: s.name });
-          } catch (error) {
-            console.error('Failed to add supplier:', error);
-            toast.error('Failed to add supplier');
-          }
+        onAdd={(s) => {
+          // Local operation - update state directly
+          setRows(prev => [...prev, s]);
+          setAddOpen(false);
+          toast.success("Supplier added", { description: s.name });
         }}
       />
     </div>

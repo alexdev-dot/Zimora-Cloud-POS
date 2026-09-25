@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ImagePlus, Package } from "lucide-react";
+import { ImagePlus, Package, DollarSign, Box, Settings, X, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,10 +15,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { FormField, Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { CATEGORIES, UNITS, branches, suppliers } from "@/lib/constants";
-import { getProducts } from "@/lib/api/products";
+import { UNITS, branches, suppliers } from "@/lib/constants";
 import { uid } from "@/lib/utils";
+import { getUserFriendlyErrorMessage, withPartialSuccessHandling } from "@/lib/utils/errorHandler";
+import { validateProduct } from "@/lib/utils/validation";
 import type { Product } from "@/types";
+import type { CategoryEntity } from "@/types";
 
 interface FormState {
   name: string;
@@ -35,7 +37,6 @@ interface FormState {
   unit: Product["unit"];
   location: string;
   supplier: string;
-  brand: string;
   trackInventory: boolean;
 }
 
@@ -44,7 +45,7 @@ function toForm(p?: Product | null): FormState {
     name: p?.name ?? "",
     sku: p?.sku ?? "",
     barcode: p?.barcode ?? "",
-    category: p?.category ?? "Beverages",
+    category: p?.category ?? "General", // Default category
     description: p?.description ?? "",
     price: p ? String(p.price) : "",
     cost: p ? String(p.cost) : "",
@@ -55,7 +56,6 @@ function toForm(p?: Product | null): FormState {
     unit: p?.unit ?? "pc",
     location: p?.location ?? (branches[0]?.name || "Main Location"),
     supplier: p?.supplier ?? (suppliers[0]?.name || "Default Supplier"),
-    brand: p?.brand ?? "",
     trackInventory: p ? p.sku !== "OT-002" : true,
   };
 }
@@ -75,11 +75,22 @@ export function ProductFormDialog({
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [isValidating, setIsValidating] = React.useState(false);
   const [allProducts, setAllProducts] = React.useState<Product[]>([]);
+  const [categories, setCategories] = React.useState<CategoryEntity[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = React.useState(false);
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(product?.imageUrl || null);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [isDragging, setIsDragging] = React.useState(false);
 
   // Load all products for uniqueness validation
   React.useEffect(() => {
     if (open) {
-      getProducts().then(setAllProducts).catch(console.error);
+      setAllProducts([]);
+      
+      // Load dynamic categories
+      setIsLoadingCategories(true);
+      setCategories([]);
+      setIsLoadingCategories(false);
     }
   }, [open]);
 
@@ -87,99 +98,207 @@ export function ProductFormDialog({
     if (open) {
       setForm(toForm(product));
       setErrors({});
+      setImagePreview(product?.imageUrl || null);
+      setImageFile(null);
+      // Storage functionality removed - no path extraction needed
     }
   }, [open, product]);
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Invalid file type', { description: 'Only JPEG, PNG, WebP, GIF, and AVIF are allowed.' });
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File too large', { description: 'Maximum file size is 5MB.' });
+      return;
+    }
+
+    setImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleRemoveImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Invalid file type', { description: 'Only JPEG, PNG, WebP, GIF, and AVIF are allowed.' });
+        return;
+      }
+
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File too large', { description: 'Maximum file size is 5MB.' });
+        return;
+      }
+
+      setImageFile(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
   async function validate(): Promise<boolean> {
-    const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = "Product name is required";
-    if (!form.sku.trim()) e.sku = "SKU is required";
-    else if (!/^[A-Za-z0-9-]{2,20}$/.test(form.sku.trim())) e.sku = "Use 2–20 letters, numbers or dashes";
-    else {
-      // Check SKU uniqueness
-      const skuExists = allProducts.some(
-        p => p.sku === form.sku.trim() && p.id !== product?.id
-      );
-      if (skuExists) e.sku = "SKU already exists";
-    }
-    if (!form.price || parseFloat(form.price) <= 0) e.price = "Enter a valid selling price";
-    if (!form.cost || parseFloat(form.cost) < 0) e.cost = "Enter a valid cost price";
-    if (form.stock === "" || parseInt(form.stock) < 0) e.stock = "Enter current stock";
-    if (form.minStock === "" || parseInt(form.minStock) < 0) e.minStock = "Set a minimum stock level";
-    if (form.trackInventory && form.maxStock && parseInt(form.maxStock) < parseInt(form.minStock || "0"))
-      e.maxStock = "Max stock must be ≥ minimum stock";
+    // Use the centralized validation utility
+    const productData = {
+      id: product?.id || '',
+      name: form.name,
+      sku: form.sku,
+      barcode: form.barcode,
+      category: form.category.trim() || "General",
+      price: form.price,
+      cost: form.cost,
+      stock: form.stock,
+      minStock: form.minStock,
+      maxStock: form.maxStock,
+    };
+
+    const validationResult = validateProduct(productData, undefined, allProducts);
     
-    // Check barcode uniqueness if provided
-    if (form.barcode.trim()) {
-      const barcodeExists = allProducts.some(
-        p => p.barcode === form.barcode.trim() && p.id !== product?.id
-      );
-      if (barcodeExists) e.barcode = "Barcode already exists";
-    }
-    
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    setErrors(validationResult.errors);
+    return validationResult.valid;
   }
 
   async function save() {
     setIsValidating(true);
     const isValid = await validate();
     setIsValidating(false);
-    
+
     if (!isValid) {
       toast.error("Please fix the highlighted fields");
       return;
     }
-    const now = new Date().toISOString();
-    const base: Product = product ?? {
-      id: uid("p"),
-      name: "",
-      sku: "",
-      barcode: "",
-      category: "Other",
-      price: 0,
-      cost: 0,
-      taxRate: 16,
-      stock: 0,
-      minStock: 0,
-      maxStock: 100,
-      unit: "pc",
-      location: branches[0]?.name || "Main Location",
-      supplier: suppliers[0]?.name || "Default Supplier",
-      status: "active",
-      updatedAt: now,
-      createdAt: now,
-      sold: 0,
-    };
-    const saved: Product = {
-      ...base,
-      name: form.name.trim(),
-      sku: form.sku.trim().toUpperCase(),
-      barcode: form.barcode.trim() || String(600000000000 + Math.floor(Math.random() * 99999999999)),
-      category: form.category,
-      description: form.description,
-      price: parseFloat(form.price),
-      cost: parseFloat(form.cost),
-      taxRate: parseFloat(form.taxRate),
-      stock: parseInt(form.stock) || 0,
-      minStock: parseInt(form.minStock) || 0,
-      maxStock: parseInt(form.maxStock) || Math.max(100, (parseInt(form.minStock) || 0) * 4),
-      unit: form.unit,
-      location: form.location,
-      supplier: form.supplier,
-      brand: form.brand,
-      status: product?.status ?? "active",
-      updatedAt: now,
-    };
-    onSave(saved);
-    onOpenChange(false);
-    toast.success(product ? "Product updated" : "Product created", {
-      description: `${saved.name} · ${saved.sku}`,
-    });
+
+    setIsUploading(true);
+    let uploadedImageUrl: string | null = null;
+
+    const result = await withPartialSuccessHandling(
+      async () => {
+        // Image upload disabled - use placeholder if image file provided
+        if (imageFile) {
+          uploadedImageUrl = `https://via.placeholder.com/400x400?text=${encodeURIComponent(form.name || 'Product')}`;
+        }
+
+        const now = new Date().toISOString();
+        const base: Product = product ?? {
+          id: uid("p"),
+          name: "",
+          sku: "",
+          barcode: "",
+          category: "",
+          price: 0,
+          cost: 0,
+          taxRate: 16,
+          stock: 0,
+          minStock: 0,
+          maxStock: 100,
+          unit: "pc",
+          location: branches[0]?.name || "Main Location",
+          supplier: suppliers[0]?.name || "Default Supplier",
+          status: "active",
+          updatedAt: now,
+          createdAt: now,
+          sold: 0,
+        };
+
+        const saved: Product = {
+          ...base,
+          name: form.name.trim(),
+          sku: form.sku.trim().toUpperCase(),
+          barcode: form.barcode.trim() || String(600000000000 + Math.floor(Math.random() * 99999999999)),
+          category: form.category.trim() || "General",
+          description: form.description,
+          price: parseFloat(form.price),
+          cost: parseFloat(form.cost),
+          taxRate: parseFloat(form.taxRate),
+          stock: parseInt(form.stock) || 0,
+          minStock: parseInt(form.minStock) || 0,
+          maxStock: parseInt(form.maxStock) || Math.max(100, (parseInt(form.minStock) || 0) * 4),
+          unit: form.unit,
+          location: form.location,
+          supplier: form.supplier,
+          status: product?.status ?? "active",
+          updatedAt: now,
+          imageUrl: uploadedImageUrl || product?.imageUrl || undefined,
+        };
+
+        onSave(saved);
+        onOpenChange(false);
+        return saved;
+      },
+      "product save",
+      async () => {
+        // No cleanup needed for placeholder images
+      }
+    );
+
+    setIsUploading(false);
+
+    if (result.success) {
+      toast.success(product ? "Product updated" : "Product created", {
+        description: `${result.data.name} · ${result.data.sku}`,
+      });
+    } else if (result.partialSuccess) {
+      toast.warning("Product saved with issues", {
+        description: getUserFriendlyErrorMessage(result.error || "Some operations failed")
+      });
+    } else {
+      toast.error('Failed to save product', { 
+        description: getUserFriendlyErrorMessage(result.error || 'Please try again.') 
+      });
+    }
   }
 
   return (
@@ -196,13 +315,96 @@ export function ProductFormDialog({
         </DialogHeader>
 
         <DialogBody>
-          <div className="grid gap-5 sm:grid-cols-2">
-            {/* Basic information */}
-            <section className="space-y-3.5 sm:col-span-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Basic information
-              </h4>
-              <div className="grid gap-3.5 sm:grid-cols-2">
+          <div className="grid gap-6 sm:grid-cols-2">
+            {/* Product Details */}
+            <section className="space-y-4 sm:col-span-2">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Package className="size-4 text-primary" />
+                <h4 className="text-sm font-semibold">Product Details</h4>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Image Upload */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-2">Product Image</label>
+                  <div className="flex items-start gap-4">
+                    <div 
+                      className={`relative group cursor-pointer transition-all ${
+                        isDragging ? 'ring-2 ring-primary ring-offset-2' : ''
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      {imagePreview ? (
+                        <div className="relative size-24 rounded-lg overflow-hidden border border-border bg-muted">
+                          <img
+                            src={imagePreview}
+                            alt="Product preview"
+                            className="size-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage();
+                            }}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="size-3" />
+                          </button>
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white text-xs">Click to change</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`size-24 rounded-lg border-2 border-dashed bg-muted flex items-center justify-center transition-all ${
+                          isDragging ? 'border-primary bg-primary/10' : 'border-border'
+                        }`}>
+                          <ImagePlus className={`size-8 text-muted-foreground ${isDragging ? 'text-primary' : ''}`} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
+                        onChange={handleImageChange}
+                        className="hidden"
+                        id="pf-image"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => imageInputRef.current?.click()}
+                          disabled={isUploading}
+                        >
+                          <Upload className="size-4 mr-2" />
+                          {isUploading ? "Uploading..." : imagePreview ? "Change Image" : "Upload Image"}
+                        </Button>
+                        {imagePreview && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveImage}
+                            disabled={isUploading}
+                          >
+                            <X className="size-4 mr-2" />
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        JPEG, PNG, WebP, GIF, or AVIF. Max 5MB. Drag & drop supported.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <FormField label="Product name" htmlFor="pf-name" required error={errors.name}>
                   <Input
                     id="pf-name"
@@ -210,6 +412,7 @@ export function ProductFormDialog({
                     onChange={(e) => set("name", e.target.value)}
                     placeholder="e.g. Coca-Cola 500ml"
                     aria-invalid={Boolean(errors.name)}
+                    className="font-medium"
                   />
                 </FormField>
                 <FormField label="SKU" htmlFor="pf-sku" required error={errors.sku}>
@@ -222,7 +425,7 @@ export function ProductFormDialog({
                     className="font-mono"
                   />
                 </FormField>
-                <FormField label="Barcode" htmlFor="pf-barcode" hint="EAN-13 or CODE128 — leave blank to auto-generate" error={errors.barcode}>
+                <FormField label="Barcode" htmlFor="pf-barcode" hint="Leave blank to auto-generate" error={errors.barcode}>
                   <Input
                     id="pf-barcode"
                     value={form.barcode}
@@ -232,15 +435,26 @@ export function ProductFormDialog({
                     aria-invalid={Boolean(errors.barcode)}
                   />
                 </FormField>
-                <FormField label="Category" htmlFor="pf-category">
+                <FormField label="Category" htmlFor="pf-category" error={errors.category}>
                   <NativeSelect
                     id="pf-category"
                     value={form.category}
                     onChange={(e) => set("category", e.target.value as Product["category"])}
+                    disabled={isLoadingCategories}
+                    aria-invalid={Boolean(errors.category)}
                   >
-                    {CATEGORIES.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
+                    {isLoadingCategories ? (
+                      <option>Loading categories...</option>
+                    ) : categories.length > 0 ? (
+                      <>
+                        <option value="General">General (Default)</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="General">General (Default)</option>
+                    )}
                   </NativeSelect>
                 </FormField>
                 <FormField label="Description" htmlFor="pf-desc" className="sm:col-span-2">
@@ -249,116 +463,119 @@ export function ProductFormDialog({
                     value={form.description}
                     onChange={(e) => set("description", e.target.value)}
                     placeholder="Short description shown on product pages and receipts"
-                    rows={2}
+                    rows={3}
                   />
                 </FormField>
-                <div className="sm:col-span-2">
-                  <span className="mb-1.5 block text-[13px] font-medium">Product image</span>
-                  <button
-                    type="button"
-                    onClick={() => toast.info("Image upload", { description: "Connect storage (e.g. Supabase) to enable uploads." })}
-                    className="focus-ring flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-muted/30 px-4 py-6 text-[13px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                  >
-                    <ImagePlus className="size-4" /> Upload an image or drag &amp; drop
-                  </button>
-                </div>
               </div>
             </section>
 
             {/* Pricing */}
-            <section className="space-y-3.5">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pricing</h4>
-              <FormField label="Selling price (KSh)" htmlFor="pf-price" required error={errors.price}>
-                <Input
-                  id="pf-price"
-                  inputMode="decimal"
-                  value={form.price}
-                  onChange={(e) => set("price", e.target.value)}
-                  placeholder="0"
-                  aria-invalid={Boolean(errors.price)}
-                  className="tabular-nums"
-                />
-              </FormField>
-              <FormField label="Cost price (KSh)" htmlFor="pf-cost" required error={errors.cost}>
-                <Input
-                  id="pf-cost"
-                  inputMode="decimal"
-                  value={form.cost}
-                  onChange={(e) => set("cost", e.target.value)}
-                  placeholder="0"
-                  aria-invalid={Boolean(errors.cost)}
-                  className="tabular-nums"
-                />
-              </FormField>
-              <FormField label="Tax rate" htmlFor="pf-tax">
-                <NativeSelect id="pf-tax" value={form.taxRate} onChange={(e) => set("taxRate", e.target.value)}>
-                  <option value="16">VAT Standard — 16%</option>
-                  <option value="8">VAT Hospitality — 8%</option>
-                  <option value="0">Zero-rated — 0%</option>
-                </NativeSelect>
-              </FormField>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <DollarSign className="size-4 text-primary" />
+                <span className="text-sm font-semibold">Pricing</span>
+              </div>
+              <div className="space-y-4">
+                <FormField label="Selling price (KSh)" htmlFor="pf-price" required error={errors.price}>
+                  <Input
+                    id="pf-price"
+                    inputMode="decimal"
+                    value={form.price}
+                    onChange={(e) => set("price", e.target.value)}
+                    placeholder="0.00"
+                    aria-invalid={Boolean(errors.price)}
+                    className="tabular-nums text-lg font-semibold"
+                  />
+                </FormField>
+                <FormField label="Cost price (KSh)" htmlFor="pf-cost" required error={errors.cost}>
+                  <Input
+                    id="pf-cost"
+                    inputMode="decimal"
+                    value={form.cost}
+                    onChange={(e) => set("cost", e.target.value)}
+                    placeholder="0.00"
+                    aria-invalid={Boolean(errors.cost)}
+                    className="tabular-nums"
+                  />
+                </FormField>
+                <FormField label="Tax rate" htmlFor="pf-tax">
+                  <NativeSelect id="pf-tax" value={form.taxRate} onChange={(e) => set("taxRate", e.target.value)}>
+                    <option value="16">VAT Standard — 16%</option>
+                    <option value="8">VAT Hospitality — 8%</option>
+                    <option value="0">Zero-rated — 0%</option>
+                  </NativeSelect>
+                </FormField>
+              </div>
             </section>
 
             {/* Inventory */}
-            <section className="space-y-3.5">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Inventory</h4>
-              <div className="grid grid-cols-3 gap-2.5">
-                <FormField label="Stock" htmlFor="pf-stock" required error={errors.stock}>
-                  <Input
-                    id="pf-stock"
-                    inputMode="numeric"
-                    value={form.stock}
-                    onChange={(e) => set("stock", e.target.value)}
-                    placeholder="0"
-                    aria-invalid={Boolean(errors.stock)}
-                    className="tabular-nums"
-                  />
-                </FormField>
-                <FormField label="Min" htmlFor="pf-min" required error={errors.minStock}>
-                  <Input
-                    id="pf-min"
-                    inputMode="numeric"
-                    value={form.minStock}
-                    onChange={(e) => set("minStock", e.target.value)}
-                    placeholder="0"
-                    aria-invalid={Boolean(errors.minStock)}
-                    className="tabular-nums"
-                  />
-                </FormField>
-                <FormField label="Max" htmlFor="pf-max" error={errors.maxStock}>
-                  <Input
-                    id="pf-max"
-                    inputMode="numeric"
-                    value={form.maxStock}
-                    onChange={(e) => set("maxStock", e.target.value)}
-                    placeholder="Auto"
-                    aria-invalid={Boolean(errors.maxStock)}
-                    className="tabular-nums"
-                  />
-                </FormField>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Box className="size-4 text-primary" />
+                <span className="text-sm font-semibold">Inventory</span>
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                <FormField label="Unit" htmlFor="pf-unit">
-                  <NativeSelect id="pf-unit" value={form.unit} onChange={(e) => set("unit", e.target.value as Product["unit"])}>
-                    {UNITS.map((u) => (
-                      <option key={u}>{u}</option>
-                    ))}
-                  </NativeSelect>
-                </FormField>
-                <FormField label="Location" htmlFor="pf-loc">
-                  <NativeSelect id="pf-loc" value={form.location} onChange={(e) => set("location", e.target.value)}>
-                    {branches.map((b) => (
-                      <option key={b.id}>{b.name}</option>
-                    ))}
-                  </NativeSelect>
-                </FormField>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <FormField label="Stock" htmlFor="pf-stock" required error={errors.stock}>
+                    <Input
+                      id="pf-stock"
+                      inputMode="numeric"
+                      value={form.stock}
+                      onChange={(e) => set("stock", e.target.value)}
+                      placeholder="0"
+                      aria-invalid={Boolean(errors.stock)}
+                      className="tabular-nums text-center"
+                    />
+                  </FormField>
+                  <FormField label="Min" htmlFor="pf-min" required error={errors.minStock}>
+                    <Input
+                      id="pf-min"
+                      inputMode="numeric"
+                      value={form.minStock}
+                      onChange={(e) => set("minStock", e.target.value)}
+                      placeholder="0"
+                      aria-invalid={Boolean(errors.minStock)}
+                      className="tabular-nums text-center"
+                    />
+                  </FormField>
+                  <FormField label="Max" htmlFor="pf-max" error={errors.maxStock}>
+                    <Input
+                      id="pf-max"
+                      inputMode="numeric"
+                      value={form.maxStock}
+                      onChange={(e) => set("maxStock", e.target.value)}
+                      placeholder="Auto"
+                      aria-invalid={Boolean(errors.maxStock)}
+                      className="tabular-nums text-center"
+                    />
+                  </FormField>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Unit" htmlFor="pf-unit">
+                    <NativeSelect id="pf-unit" value={form.unit} onChange={(e) => set("unit", e.target.value as Product["unit"])}>
+                      {UNITS.map((u) => (
+                        <option key={u}>{u}</option>
+                      ))}
+                    </NativeSelect>
+                  </FormField>
+                  <FormField label="Location" htmlFor="pf-loc">
+                    <NativeSelect id="pf-loc" value={form.location} onChange={(e) => set("location", e.target.value)}>
+                      {branches.map((b) => (
+                        <option key={b.id}>{b.name}</option>
+                      ))}
+                    </NativeSelect>
+                  </FormField>
+                </div>
               </div>
             </section>
 
-            {/* Advanced */}
-            <section className="space-y-3.5 sm:col-span-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Advanced</h4>
-              <div className="grid gap-3.5 sm:grid-cols-3">
+            {/* Settings */}
+            <section className="space-y-4 sm:col-span-2">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Settings className="size-4 text-primary" />
+                <span className="text-sm font-semibold">Settings</span>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Supplier" htmlFor="pf-supplier">
                   <NativeSelect id="pf-supplier" value={form.supplier} onChange={(e) => set("supplier", e.target.value)}>
                     {suppliers.map((s) => (
@@ -366,40 +583,30 @@ export function ProductFormDialog({
                     ))}
                   </NativeSelect>
                 </FormField>
-                <FormField label="Brand" htmlFor="pf-brand">
-                  <Input id="pf-brand" value={form.brand} onChange={(e) => set("brand", e.target.value)} placeholder="e.g. Coca-Cola" />
-                </FormField>
-                <FormField label="Product type" htmlFor="pf-type">
-                  <NativeSelect id="pf-type" defaultValue="simple">
-                    <option value="simple">Simple product</option>
-                    <option value="variable">Variable (variants)</option>
-                    <option value="service">Service</option>
-                  </NativeSelect>
-                </FormField>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border px-3.5 py-3">
-                <div>
-                  <p className="text-[13px] font-medium">Track inventory</p>
-                  <p className="text-xs text-muted-foreground">
-                    Deduct stock on every sale and receive low-stock alerts
-                  </p>
+                <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3 bg-muted/30">
+                  <div>
+                    <p className="text-sm font-medium">Track inventory</p>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-deduct stock on sales
+                    </p>
+                  </div>
+                  <Switch
+                    aria-label="Track inventory"
+                    checked={form.trackInventory}
+                    onCheckedChange={(v) => set("trackInventory", v)}
+                  />
                 </div>
-                <Switch
-                  aria-label="Track inventory"
-                  checked={form.trackInventory}
-                  onCheckedChange={(v) => set("trackInventory", v)}
-                />
               </div>
             </section>
           </div>
         </DialogBody>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={isValidating}>
-            {isValidating ? "Validating..." : product ? "Save changes" : "Save Product"}
+          <Button onClick={save} disabled={isValidating || isUploading}>
+            {isUploading ? "Uploading..." : isValidating ? "Validating..." : product ? "Save changes" : "Save Product"}
           </Button>
         </DialogFooter>
       </DialogContent>

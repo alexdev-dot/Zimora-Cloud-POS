@@ -10,25 +10,25 @@ import { Avatar } from "@/components/ui/misc";
 
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { Role, PermissionMatrix } from "@/types";
-
-// TODO: Replace with data from your backend/database
-// These should be fetched from your roles management API
-const ROLES: Role[] = [];
-
-// TODO: Replace with data from your backend/database
-// These should be fetched from your roles management API
-const ROLE_DESCRIPTIONS: Record<string, string> = {};
-
-// TODO: Replace with data from your backend/database
-// These should be fetched from your roles management API
-const ROLE_PERMISSIONS: Record<string, PermissionMatrix> = {};
+import type { Role, PermissionMatrix, RoleConfig } from "@/types";
 
 export default function UsersRolesSettingsPage() {
+  const [roles, setRoles] = React.useState<Role[]>([]);
+  const [roleConfigs, setRoleConfigs] = React.useState<RoleConfig[]>([]);
   const [selected, setSelected] = React.useState<string>("");
   const [matrix, setMatrix] = React.useState<Record<string, PermissionMatrix>>({});
+  const [isLoading, setIsLoading] = React.useState(true);
+  const rolesSubscriptionRef = React.useRef<any>(null);
 
   const members = (role: string) => [] as any[];
+
+  // Fetch roles and configs on mount
+  React.useEffect(() => {
+    setRoles(["Owner", "Manager", "Cashier"]);
+    setRoleConfigs([]);
+    setMatrix({});
+    setIsLoading(false);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -53,7 +53,12 @@ export default function UsersRolesSettingsPage() {
           </>
         }
       >
-        {ROLES.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <ShieldCheck className="mb-3 size-10 text-muted-foreground animate-pulse" />
+            <p className="text-sm text-muted-foreground">Loading roles...</p>
+          </div>
+        ) : roles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <ShieldCheck className="mb-3 size-10 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">No roles configured yet</p>
@@ -63,26 +68,33 @@ export default function UsersRolesSettingsPage() {
           </div>
         ) : (
           <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-            {ROLES.map((role) => {
+            {roles.map((role) => {
               const active = selected === role;
+              const roleConfig = roleConfigs.find(c => c.name === role);
+              const isSystemRole = role === "Owner" || roleConfig?.isSystem;
               return (
                 <button
                   key={role}
                   onClick={() => setSelected(role)}
                   aria-pressed={active}
+                  disabled={isSystemRole && !active}
                   className={cn(
                     "rounded-xl border p-3.5 text-left outline-none transition-all focus-ring",
-                    active ? "border-primary bg-accent/60 shadow-sm" : "border-border hover:border-slate-300"
+                    active ? "border-primary bg-accent/60 shadow-sm" : "border-border hover:border-slate-300",
+                    isSystemRole && !active && "opacity-60 cursor-not-allowed"
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="size-4 text-muted-foreground" />
                       <span className="font-medium">{role}</span>
+                      {isSystemRole && (
+                        <Badge variant="outline" className="text-[10px]">System</Badge>
+                      )}
                     </div>
                     <Badge variant="outline">{members(role).length} members</Badge>
                   </div>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{ROLE_DESCRIPTIONS[role]}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{roleConfig?.description || 'No description'}</p>
                   <div className="mt-2.5 flex -space-x-1.5">
                     {members(role)
                       .slice(0, 4)

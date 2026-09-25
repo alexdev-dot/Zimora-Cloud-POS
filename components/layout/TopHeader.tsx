@@ -13,9 +13,11 @@ import {
   Info,
   LogOut,
   Menu,
+  Moon,
   RotateCcw,
   Search,
   Settings,
+  Sun,
   UserPlus,
   XCircle,
   type LucideIcon,
@@ -33,15 +35,19 @@ import {
 import { Avatar } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/layout/SidebarNav";
+import { useTheme } from "@/lib/contexts/ThemeContext";
+
+// Routes that should always be in light mode
+const LIGHT_MODE_ROUTES = ["/", "/privacy-policy", "/terms-of-use"];
 
 const NOTIF_ICON: Record<string, { icon: LucideIcon; className: string }> = {
-  low_stock: { icon: AlertTriangle, className: "bg-amber-50 text-amber-600" },
-  payment: { icon: CheckCircle2, className: "bg-emerald-50 text-emerald-600" },
-  failed_payment: { icon: XCircle, className: "bg-red-50 text-red-600" },
-  refund: { icon: RotateCcw, className: "bg-violet-50 text-violet-600" },
-  employee: { icon: UserPlus, className: "bg-sky-50 text-sky-600" },
-  subscription: { icon: CreditCard, className: "bg-teal-50 text-teal-600" },
-  system: { icon: Info, className: "bg-slate-100 text-slate-600" },
+  low_stock: { icon: AlertTriangle, className: "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400" },
+  payment: { icon: CheckCircle2, className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
+  failed_payment: { icon: XCircle, className: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
+  refund: { icon: RotateCcw, className: "bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400" },
+  employee: { icon: UserPlus, className: "bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400" },
+  subscription: { icon: CreditCard, className: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
+  system: { icon: Info, className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
 };
 
 function settingsSubTitle(pathname: string): string | null {
@@ -65,25 +71,29 @@ export function TopHeader({
   const title = getPageTitle(pathname);
   const sub = pathname.startsWith("/settings") ? settingsSubTitle(pathname) : null;
   const unread = seedNotifications.filter((n) => !n.read).length;
+  const { theme, toggleTheme } = useTheme();
+
+  // Check if current route should be in light mode
+  const isLightModeRoute = LIGHT_MODE_ROUTES.includes(pathname);
 
   // Handle empty user data
   const userName = currentUser.name || "User";
   const userEmail = currentUser.email || "user@example.com";
-  const userRole = currentUser.role || "Administrator";
+  const userRole = currentUser.role || "Owner";
 
   return (
-    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white/90 pl-4 pr-3 backdrop-blur md:pl-6 md:pr-4">
+    <header className="sticky top-0 z-30 flex h-[56px] sm:h-[60px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white/90 pl-3 sm:pl-4 pr-2 sm:pr-3 backdrop-blur md:pl-6 md:pr-4 dark:border-border dark:bg-background/90">
       {/* Mobile brand + menu */}
       <button
         type="button"
         aria-label="Open navigation"
         onClick={onMenuClick}
-        className="focus-ring -ml-1 rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+        className="focus-ring -ml-1 rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden dark:text-muted-foreground dark:hover:bg-muted"
       >
         <Menu className="size-5" />
       </button>
       <Link href="/dashboard" className="lg:hidden" aria-label="Zimora Cloud POS home">
-        <BrandMark className="h-10 w-auto" />
+        <BrandMark className="h-8 sm:h-10 w-auto" />
       </Link>
 
       {/* Desktop sidebar toggle */}
@@ -92,7 +102,7 @@ export function TopHeader({
           type="button"
           aria-label="Toggle sidebar"
           onClick={onSidebarToggle}
-          className="focus-ring hidden rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:block"
+          className="focus-ring hidden rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:block dark:text-muted-foreground dark:hover:bg-muted"
         >
           <Menu className="size-5" />
         </button>
@@ -103,11 +113,11 @@ export function TopHeader({
         <Link href="/dashboard" className="text-muted-foreground transition-colors hover:text-foreground">
           Home
         </Link>
-        <ChevronRight className="size-3.5 shrink-0 text-slate-300" />
+        <ChevronRight className="size-3.5 shrink-0 text-slate-300 dark:text-muted-foreground/50" />
         <span className="truncate font-medium">{title}</span>
         {sub && (
           <>
-            <ChevronRight className="size-3.5 shrink-0 text-slate-300" />
+            <ChevronRight className="size-3.5 shrink-0 text-slate-300 dark:text-muted-foreground/50" />
             <span className="truncate font-medium">{sub}</span>
           </>
         )}
@@ -118,11 +128,11 @@ export function TopHeader({
         <button
           type="button"
           onClick={onSearchClick}
-          className="focus-ring hidden h-9 items-center gap-2 rounded-lg border border-input bg-muted/50 pl-3 pr-2 text-[13px] text-muted-foreground shadow-sm transition-colors hover:bg-muted sm:flex sm:w-56 lg:w-64"
+          className="focus-ring hidden h-9 items-center gap-2 rounded-lg border border-input bg-muted/50 pl-3 pr-2 text-[13px] text-muted-foreground shadow-sm transition-colors hover:bg-muted sm:flex sm:w-48 md:w-56 lg:w-64"
         >
           <Search className="size-3.5" />
           <span className="flex-1 text-left">Search…</span>
-          <kbd className="kbd">⌘K</kbd>
+          <kbd className="kbd hidden sm:inline-block">⌘K</kbd>
         </button>
         <Button
           variant="ghost"
@@ -134,6 +144,19 @@ export function TopHeader({
           <Search />
         </Button>
 
+        {/* Theme toggle - hide on light mode routes */}
+        {!isLightModeRoute && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            onClick={toggleTheme}
+            className="focus-ring"
+          >
+            {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          </Button>
+        )}
+
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -142,7 +165,7 @@ export function TopHeader({
               {unread > 0 && (
                 <span
                   aria-hidden
-                  className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white"
+                  className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white dark:ring-background"
                 >
                   {unread}
                 </span>
@@ -203,7 +226,7 @@ export function TopHeader({
         {/* Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="focus-ring flex items-center gap-2.5 rounded-lg py-1 pl-1 pr-1.5 transition-colors hover:bg-slate-100 md:pr-2">
+            <button className="focus-ring flex items-center gap-2.5 rounded-lg py-1 pl-1 pr-1.5 transition-colors hover:bg-slate-100 md:pr-2 dark:hover:bg-muted">
               <Avatar name={userName} size={8} />
               <span className="hidden min-w-0 text-left lg:block">
                 <span className="block max-w-[140px] truncate text-[13px] font-semibold leading-tight">

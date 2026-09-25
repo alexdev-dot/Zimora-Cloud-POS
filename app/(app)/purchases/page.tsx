@@ -39,7 +39,6 @@ import {
 import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { formatKES, formatDate, isoAhead } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
-import { getPurchaseOrders, createPurchaseOrder, updatePurchaseOrder, updatePurchaseOrderStatus, subscribeToPurchaseOrders, unsubscribeFromPurchaseOrders } from "@/lib/api/purchaseOrders";
 import type { PurchaseOrder } from "@/types";
 
 export default function PurchasesPage() {
@@ -49,38 +48,11 @@ export default function PurchasesPage() {
   const [detail, setDetail] = React.useState<PurchaseOrder | null>(null);
   const [cancelTarget, setCancelTarget] = React.useState<PurchaseOrder | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
-  const subscriptionRef = React.useRef<any>(null);
 
   // Fetch purchase orders on mount
   React.useEffect(() => {
-    async function fetchPurchaseOrders() {
-      try {
-        const data = await getPurchaseOrders();
-        setOrders(data);
-      } catch (error) {
-        console.error('Error fetching purchase orders:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchPurchaseOrders();
-
-    // Set up real-time subscription (separate from data fetch to avoid duplicate subscriptions)
-    if (!subscriptionRef.current) {
-      const channel = subscribeToPurchaseOrders((updatedOrders) => {
-        setOrders(updatedOrders);
-      });
-      subscriptionRef.current = channel;
-    }
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (subscriptionRef.current) {
-        unsubscribeFromPurchaseOrders(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
+    setOrders([]);
+    setIsLoading(false);
   }, []);
 
   const stats = React.useMemo(() => {
@@ -93,20 +65,13 @@ export default function PurchasesPage() {
     };
   }, [orders]);
 
-  async function receiveOrder(po: PurchaseOrder) {
-    try {
-      await updatePurchaseOrderStatus(po.id, "received");
-      // Refresh list
-      const updated = await getPurchaseOrders();
-      setOrders(updated);
-      setDetail(null);
-      toast.success("Stock received", {
-        description: `${po.id} · ${po.items.length} products added to inventory at ${po.branch}.`,
-      });
-    } catch (error) {
-      console.error('Failed to receive order:', error);
-      toast.error('Failed to receive order');
-    }
+  function receiveOrder(po: PurchaseOrder) {
+    // Local operation - update state directly
+    setOrders(prev => prev.map(o => o.id === po.id ? { ...o, status: "received" } : o));
+    setDetail(null);
+    toast.success("Stock received", {
+      description: `${po.id} · ${po.items.length} products added to inventory at ${po.branch}.`,
+    });
   }
 
   const columns: ColumnDef<PurchaseOrder>[] = [
@@ -307,18 +272,11 @@ export default function PurchasesPage() {
       <NewPODialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreate={async (po) => {
-          try {
-            await createPurchaseOrder(po);
-            // Refresh list
-            const updated = await getPurchaseOrders();
-            setOrders(updated);
-            setCreateOpen(false);
-            toast.success("Purchase order created", { description: `${po.id} saved as draft.` });
-          } catch (error) {
-            console.error('Failed to create purchase order:', error);
-            toast.error('Failed to create purchase order');
-          }
+        onCreate={(po) => {
+          // Local operation - update state directly
+          setOrders(prev => [...prev, po]);
+          setCreateOpen(false);
+          toast.success("Purchase order created", { description: `${po.id} saved as draft.` });
         }}
       />
 
@@ -329,19 +287,12 @@ export default function PurchasesPage() {
         description="The purchase order will be cancelled and any expected delivery will be marked as not arriving."
         confirmLabel="Cancel order"
         destructive
-        onConfirm={async () => {
+        onConfirm={() => {
           if (cancelTarget) {
-            try {
-              await updatePurchaseOrderStatus(cancelTarget.id, "cancelled");
-              // Refresh list
-              const updated = await getPurchaseOrders();
-              setOrders(updated);
-              setCancelTarget(null);
-              toast.success("Purchase order cancelled");
-            } catch (error) {
-              console.error('Failed to cancel purchase order:', error);
-              toast.error('Failed to cancel purchase order');
-            }
+            // Local operation - update state directly
+            setOrders(prev => prev.map(o => o.id === cancelTarget.id ? { ...o, status: "cancelled" } : o));
+            setCancelTarget(null);
+            toast.success("Purchase order cancelled");
           }
         }}
       />

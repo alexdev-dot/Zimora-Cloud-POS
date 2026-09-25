@@ -36,10 +36,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { stockStatusOf, STOCK_STATUS_META } from "@/lib/utils/products";
-import { getProducts as getSupabaseProducts, createProduct, updateProduct, deleteProduct, subscribeToProducts, unsubscribeFromProducts } from "@/lib/api/products";
 import { cn, downloadCSV, formatKES, formatDate } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
 import type { Product } from "@/types";
+import type { CategoryEntity } from "@/types";
 
 export default function ProductsPage() {
   return (
@@ -54,7 +54,6 @@ function ProductsInner() {
   const loading = useSimulatedLoading(550);
 
   const [items, setItems] = React.useState<Product[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
   const [category, setCategory] = React.useState("all");
   const [stockFilter, setStockFilter] = React.useState("all");
   const [view, setView] = React.useState<"table" | "grid">("table");
@@ -62,8 +61,8 @@ function ProductsInner() {
   const [editing, setEditing] = React.useState<Product | null>(null);
   const [detail, setDetail] = React.useState<Product | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<Product[] | null>(null);
+  const [categories, setCategories] = React.useState<CategoryEntity[]>([]);
   const searchParam = params.get("q");
-  const subscriptionRef = React.useRef<any>(null);
   void searchParam;
 
   // Deep links: /products?new=1 and /products?q=SKU
@@ -73,38 +72,6 @@ function ProductsInner() {
       setFormOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Fetch products on mount
-  React.useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const data = await getSupabaseProducts();
-        setItems(data.sort((a, b) => a.name.localeCompare(b.name)));
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchProducts();
-
-    // Set up real-time subscription (separate from data fetch to avoid duplicate subscriptions)
-    if (!subscriptionRef.current) {
-      const channel = subscribeToProducts((updatedProducts) => {
-        setItems(updatedProducts.sort((a, b) => a.name.localeCompare(b.name)));
-      });
-      subscriptionRef.current = channel;
-    }
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (subscriptionRef.current) {
-        unsubscribeFromProducts(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
   }, []);
 
   const filtered = React.useMemo(
@@ -117,21 +84,14 @@ function ProductsInner() {
     [items, category, stockFilter]
   );
 
-  async function saveProduct(p: Product) {
-    try {
-      if (items.some((x) => x.id === p.id)) {
-        await updateProduct(p.id, p);
-        toast.success('Product updated');
-      } else {
-        await createProduct(p);
-        toast.success('Product created');
-      }
-      // Refresh list
-      const updated = await getSupabaseProducts();
-      setItems(updated.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (error) {
-      console.error('Failed to save product:', error);
-      toast.error('Failed to save product');
+  function saveProduct(p: Product) {
+    // Local-only save - no database
+    if (items.some((x) => x.id === p.id)) {
+      setItems(items.map((x) => x.id === p.id ? p : x));
+      toast.success('Product updated');
+    } else {
+      setItems([...items, p]);
+      toast.success('Product created');
     }
   }
 
@@ -150,38 +110,18 @@ function ProductsInner() {
     toast.success("Product duplicated", { description: `${copy.name} created as a draft copy.` });
   }
 
-  async function archive(rows: Product[]) {
-    try {
-      for (const row of rows) {
-        await updateProduct(row.id, { status: "archived" });
-      }
-      // Refresh list
-      const updated = await getSupabaseProducts();
-      setItems(updated.sort((a, b) => a.name.localeCompare(b.name)));
-      toast.success(rows.length === 1 ? "Product archived" : `${rows.length} products archived`);
-    } catch (error) {
-      console.error('Failed to archive products:', error);
-      toast.error('Failed to archive products');
-    }
+  function archive(rows: Product[]) {
+    setItems(items.map((item) => rows.some((r) => r.id === item.id) ? { ...item, status: "archived" as const } : item));
+    toast.success(rows.length === 1 ? "Product archived" : `${rows.length} products archived`);
   }
 
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!pendingDelete) return;
-    try {
-      for (const product of pendingDelete) {
-        await deleteProduct(product.id);
-      }
-      // Refresh list
-      const updated = await getSupabaseProducts();
-      setItems(updated.sort((a, b) => a.name.localeCompare(b.name)));
-      toast.success(
-        pendingDelete.length === 1 ? "Product deleted" : `${pendingDelete.length} products deleted`
-      );
-      setPendingDelete(null);
-    } catch (error) {
-      console.error('Failed to delete products:', error);
-      toast.error('Failed to delete products');
-    }
+    setItems(items.filter((item) => !pendingDelete.some((p) => p.id === item.id)));
+    toast.success(
+      pendingDelete.length === 1 ? "Product deleted" : `${pendingDelete.length} products deleted`
+    );
+    setPendingDelete(null);
   }
 
   function exportCsv(rows: Product[]) {
@@ -210,10 +150,10 @@ function ProductsInner() {
       sortable: true,
       cell: (r) => (
         <div className="flex items-center gap-3">
-          <ProductThumb category={r.category} className="size-9 shrink-0" />
+          <ProductThumb category={r.category} imageUrl={r.imageUrl} className="size-9 shrink-0" />
           <div className="min-w-0">
             <p className="max-w-[220px] truncate font-medium">{r.name}</p>
-            <p className="text-xs text-muted-foreground">{r.brand ?? "Generic"}</p>
+            <p className="text-xs text-muted-foreground">{r.sku}</p>
           </div>
         </div>
       ),
@@ -340,7 +280,7 @@ function ProductsInner() {
           columns={columns}
           data={filtered}
           rowKey={(r) => r.id}
-          loading={loading || isLoading}
+          loading={loading}
           searchable="Search name, SKU or barcode…"
           pageSize={10}
           selectable
@@ -367,9 +307,15 @@ function ProductsInner() {
                 className="w-[150px]"
               >
                 <option value="all">All categories</option>
-                {Array.from(new Set(items.map((p) => p.category))).map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
+                {categories.length > 0 ? (
+                  categories.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))
+                ) : (
+                  Array.from(new Set(items.map((p) => p.category))).map((c) => (
+                    <option key={c}>{c}</option>
+                  ))
+                )}
               </NativeSelect>
               <NativeSelect
                 aria-label="Filter by stock status"
@@ -403,7 +349,7 @@ function ProductsInner() {
           mobileCard={(r) => (
             <div className="space-y-1.5">
               <div className="flex items-center gap-2.5">
-                <ProductThumb category={r.category} className="size-10 shrink-0" />
+                <ProductThumb category={r.category} imageUrl={r.imageUrl} className="size-10 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13.5px] font-medium">{r.name}</p>
                   <p className="font-mono text-[11px] text-muted-foreground">{r.sku}</p>
@@ -534,7 +480,7 @@ function ProductGridView({
           className="group rounded-xl border border-border bg-card p-4 text-left shadow-card outline-none transition-all hover:-translate-y-0.5 hover:shadow-pop focus-ring"
         >
           <div className="flex items-start justify-between">
-            <ProductThumb category={p.category} className="size-12" />
+            <ProductThumb category={p.category} imageUrl={p.imageUrl} className="size-12" />
             <StatusBadge status={p.status} />
           </div>
           <p className="mt-3 line-clamp-2 min-h-[2.5em] text-[13.5px] font-medium leading-snug">{p.name}</p>

@@ -43,7 +43,6 @@ import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { EXPENSE_CATEGORIES } from "@/lib/constants";
 import { downloadCSV, formatKES, formatDate, uid } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
-import { getExpenses, createExpense, updateExpense, deleteExpense, subscribeToExpenses, unsubscribeFromExpenses } from "@/lib/api/expenses";
 import type { Expense } from "@/types";
 
 export default function ExpensesPage() {
@@ -63,7 +62,6 @@ function ExpensesInner() {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Expense | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Expense | null>(null);
-  const subscriptionRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     if (params.get("new")) setFormOpen(true);
@@ -72,34 +70,8 @@ function ExpensesInner() {
 
   // Fetch expenses on mount
   React.useEffect(() => {
-    async function fetchExpenses() {
-      try {
-        const data = await getExpenses();
-        setRows(data);
-      } catch (error) {
-        console.error('Error fetching expenses:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchExpenses();
-
-    // Set up real-time subscription (separate from data fetch to avoid duplicate subscriptions)
-    if (!subscriptionRef.current) {
-      const channel = subscribeToExpenses((updatedExpenses) => {
-        setRows(updatedExpenses);
-      });
-      subscriptionRef.current = channel;
-    }
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (subscriptionRef.current) {
-        unsubscribeFromExpenses(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
+    setRows([]);
+    setIsLoading(false);
   }, []);
 
   const filtered = React.useMemo(
@@ -228,7 +200,7 @@ function ExpensesInner() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard loading={loading} label="Total Expenses" value={formatKES(stats.total)} icon={Wallet} />
         <MetricCard
           loading={loading}
@@ -255,7 +227,7 @@ function ExpensesInner() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <DataTable
             columns={columns}
@@ -366,23 +338,16 @@ function ExpensesInner() {
           setFormOpen(o);
           if (!o) setEditing(null);
         }}
-        onSave={async (x) => {
-          try {
-            if (editing) {
-              await updateExpense(x.id, x);
-            } else {
-              await createExpense(x);
-            }
-            // Refresh list
-            const updated = await getExpenses();
-            setRows(updated);
-            setFormOpen(false);
-            setEditing(null);
-            toast.success(editing ? "Expense updated" : "Expense recorded", { description: `${x.name} · ${formatKES(x.amount)}` });
-          } catch (error) {
-            console.error('Failed to save expense:', error);
-            toast.error('Failed to save expense');
+        onSave={(x) => {
+          // Local operation - update state directly
+          if (editing) {
+            setRows(prev => prev.map(r => r.id === x.id ? x : r));
+          } else {
+            setRows(prev => [...prev, x]);
           }
+          setFormOpen(false);
+          setEditing(null);
+          toast.success(editing ? "Expense updated" : "Expense recorded", { description: `${x.name} · ${formatKES(x.amount)}` });
         }}
       />
 
@@ -397,19 +362,12 @@ function ExpensesInner() {
         }
         confirmLabel="Delete expense"
         destructive
-        onConfirm={async () => {
+        onConfirm={() => {
           if (deleteTarget) {
-            try {
-              await deleteExpense(deleteTarget.id);
-              // Refresh list
-              const updated = await getExpenses();
-              setRows(updated);
-              setDeleteTarget(null);
-              toast.success("Expense deleted");
-            } catch (error) {
-              console.error('Failed to delete expense:', error);
-              toast.error('Failed to delete expense');
-            }
+            // Local operation - update state directly
+            setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
+            setDeleteTarget(null);
+            toast.success("Expense deleted");
           }
         }}
       />

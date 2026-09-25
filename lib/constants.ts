@@ -1,21 +1,16 @@
 import {
-  Activity,
   Banknote,
   Barcode,
   BarChart3,
   Bell,
   Boxes,
-  Building2,
   CircleHelp,
   CreditCard,
   CupSoda,
   Cpu,
   Droplets,
   Factory,
-  FileText,
-  Headphones,
   Home,
-  Key,
   LayoutDashboard,
   Lock,
   Package,
@@ -24,18 +19,15 @@ import {
   ReceiptText,
   Settings,
   Shield,
-  ShieldCheck,
   Smartphone,
   Split,
   Store,
-  TrendingUp,
   Truck,
   UserCog,
-  UserPlus,
   Users,
   UtensilsCrossed,
   Wallet,
-  Wrench,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import type {
@@ -45,7 +37,6 @@ import type {
   AppNotification,
   Employee,
   Supplier,
-  Category,
   PaymentMethod,
   PermissionAction,
   PermissionModule,
@@ -75,6 +66,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { label: "Point of Sale", href: "/pos", icon: Store },
       { label: "Sales", href: "/sales", icon: ReceiptText },
       { label: "Products", href: "/products", icon: Package },
+      { label: "Categories", href: "/categories", icon: Tag },
       { label: "Inventory", href: "/inventory", icon: Boxes },
       { label: "Purchases", href: "/purchases", icon: Truck },
     ],
@@ -116,49 +108,7 @@ export function getPageTitle(pathname: string): string {
 
 /* ── Catalog meta ─────────────────────────────────────────────────── */
 
-export const CATEGORY_META: Record<
-  Category,
-  { icon: LucideIcon; tile: string; badge: string; dot: string }
-> = {
-  Beverages: {
-    icon: CupSoda,
-    tile: "bg-sky-50 text-sky-700 ring-sky-100",
-    badge: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/70",
-    dot: "bg-sky-500",
-  },
-  Food: {
-    icon: UtensilsCrossed,
-    tile: "bg-amber-50 text-amber-700 ring-amber-100",
-    badge: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/70",
-    dot: "bg-amber-500",
-  },
-  Electronics: {
-    icon: Cpu,
-    tile: "bg-slate-100 text-slate-600 ring-slate-200/60",
-    badge: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
-    dot: "bg-slate-500",
-  },
-  Household: {
-    icon: Home,
-    tile: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-    badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70",
-    dot: "bg-emerald-500",
-  },
-  "Personal Care": {
-    icon: Droplets,
-    tile: "bg-rose-50 text-rose-700 ring-rose-100",
-    badge: "bg-rose-50 text-rose-700 ring-1 ring-rose-200/70",
-    dot: "bg-rose-500",
-  },
-  Other: {
-    icon: Package,
-    tile: "bg-violet-50 text-violet-700 ring-violet-100",
-    badge: "bg-violet-50 text-violet-700 ring-1 ring-violet-200/70",
-    dot: "bg-violet-500",
-  },
-};
 
-export const CATEGORIES = Object.keys(CATEGORY_META) as Category[];
 
 export const PAYMENT_META: Record<
   PaymentMethod,
@@ -219,6 +169,17 @@ export function createPermissionMatrix(
   return out;
 }
 
+/**
+ * Create a full permissions matrix with all actions enabled
+ */
+export function createFullPermissionsMatrix(): Matrix {
+  const fullSpec: any = {};
+  PERMISSION_MODULES.forEach(m => {
+    fullSpec[m.id] = ALL_PERMISSIONS;
+  });
+  return createPermissionMatrix(fullSpec);
+}
+
 export const ALL_PERMISSIONS: PermissionAction[] = ["view", "create", "edit", "delete", "export"];
 
 // TODO: Remove this - role presets should be stored in your database
@@ -233,16 +194,6 @@ export const DEFAULT_ROLE_PRESETS: Record<string, Matrix> = {
 // Role presets for employee management (temporary until moved to database)
 export const ROLE_PRESETS: Record<string, Matrix> = {
   Owner: createPermissionMatrix({
-    sales: ALL_PERMISSIONS,
-    products: ALL_PERMISSIONS,
-    inventory: ALL_PERMISSIONS,
-    customers: ALL_PERMISSIONS,
-    reports: ALL_PERMISSIONS,
-    expenses: ALL_PERMISSIONS,
-    employees: ALL_PERMISSIONS,
-    settings: ALL_PERMISSIONS,
-  }),
-  Administrator: createPermissionMatrix({
     sales: ALL_PERMISSIONS,
     products: ALL_PERMISSIONS,
     inventory: ALL_PERMISSIONS,
@@ -272,16 +223,6 @@ export const ROLE_PRESETS: Record<string, Matrix> = {
     employees: [],
     settings: [],
   }),
-  "Inventory Manager": createPermissionMatrix({
-    sales: ["view"],
-    products: ALL_PERMISSIONS,
-    inventory: ALL_PERMISSIONS,
-    customers: ["view"],
-    reports: ["view"],
-    expenses: ["view"],
-    employees: [],
-    settings: ["view"],
-  }),
 };
 
 /* ── Settings nav ─────────────────────────────────────────────────── */
@@ -304,55 +245,6 @@ export const SETTINGS_NAV: {
   { label: "Notifications", href: "/settings/notifications", icon: Bell, description: "Choose what you get alerted about" },
   { label: "Security", href: "/settings/security", icon: Shield, description: "Password, 2FA, sessions & audit log" },
 ];
-
-/* ── Admin navigation ─────────────────────────────────────────────── */
-
-export const ADMIN_NAV_GROUPS: { title: string; items: NavItem[] }[] = [
-  {
-    title: "Overview",
-    items: [
-      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-      { label: "System Health", href: "/admin/health", icon: Activity },
-    ],
-  },
-  {
-    title: "Tenant Management",
-    items: [
-      { label: "All Tenants", href: "/admin/tenants", icon: Building2 },
-      { label: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard },
-      { label: "Onboarding", href: "/admin/onboarding", icon: UserPlus },
-    ],
-  },
-  {
-    title: "User Management",
-    items: [
-      { label: "Admin Users", href: "/admin/users", icon: Users },
-      { label: "Support and Ticketing", href: "/admin/staff", icon: Headphones },
-      { label: "Permissions", href: "/admin/permissions", icon: ShieldCheck },
-      { label: "Audit Logs", href: "/admin/audit", icon: FileText },
-    ],
-  },
-  {
-    title: "System Operations",
-    items: [
-      { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-      { label: "Reports", href: "/admin/reports", icon: TrendingUp },
-      { label: "Notifications", href: "/admin/notifications", icon: Bell },
-      { label: "Maintenance", href: "/admin/maintenance", icon: Wrench },
-    ],
-  },
-  {
-    title: "Configuration",
-    items: [
-      { label: "Settings", href: "/admin/settings", icon: Settings },
-      { label: "Integrations", href: "/admin/integrations", icon: Plug },
-      { label: "API Management", href: "/admin/api", icon: Key },
-      { label: "Security", href: "/admin/security", icon: Shield },
-    ],
-  },
-];
-
-export const ADMIN_FLAT_NAV: NavItem[] = ADMIN_NAV_GROUPS.flatMap((g) => g.items);
 
 /* ── Chart palette ────────────────────────────────────────────────── */
 
@@ -390,10 +282,10 @@ export const branches: Branch[] = [
 ];
 
 export const currentUser = {
-  id: "admin",
-  name: "Administrator",
-  email: "admin@example.com",
-  role: "Administrator",
+  id: "owner",
+  name: "Owner",
+  email: "owner@example.com",
+  role: "Owner",
   avatar: null,
 };
 
@@ -434,11 +326,11 @@ export const notifications: AppNotification[] = [];
 
 export const employees: Employee[] = [
   {
-    id: "admin",
+    id: "owner",
     employeeNo: "EMP001",
-    name: "Administrator",
-    role: "Administrator",
-    email: "admin@example.com",
+    name: "Owner",
+    role: "Owner",
+    email: "owner@example.com",
     phone: "+254700000000",
     branch: "Main Branch",
     status: "active",

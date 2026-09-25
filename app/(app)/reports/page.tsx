@@ -39,10 +39,6 @@ import {
 } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
 import { Skeleton } from "@/components/ui/misc";
-import { getSales, subscribeToSales, unsubscribeFromSales } from "@/lib/api/sales";
-import { getProducts, subscribeToProducts, unsubscribeFromProducts } from "@/lib/api/products";
-import { getExpenses, subscribeToExpenses, unsubscribeFromExpenses } from "@/lib/api/expenses";
-import { getEmployees, subscribeToEmployees, unsubscribeFromEmployees } from "@/lib/api/employees";
 import type { PnlMonth } from "@/types";
 
 export default function ReportsPage() {
@@ -53,82 +49,14 @@ export default function ReportsPage() {
   const [expenses, setExpenses] = React.useState<any[]>([]);
   const [employees, setEmployees] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const salesSubscriptionRef = React.useRef<any>(null);
-  const productsSubscriptionRef = React.useRef<any>(null);
-  const expensesSubscriptionRef = React.useRef<any>(null);
-  const employeesSubscriptionRef = React.useRef<any>(null);
 
   // Fetch data on mount
   React.useEffect(() => {
-    async function fetchReportData() {
-      try {
-        const [salesData, productsData, expensesData, employeesData] = await Promise.all([
-          getSales(),
-          getProducts(),
-          getExpenses(),
-          getEmployees()
-        ]);
-        setSales(salesData);
-        setProducts(productsData);
-        setExpenses(expensesData);
-        setEmployees(employeesData);
-      } catch (error) {
-        console.error('Error fetching report data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchReportData();
-
-    // Set up real-time subscriptions (separate from data fetch to avoid duplicate subscriptions)
-    if (!salesSubscriptionRef.current) {
-      const salesChannel = subscribeToSales((updatedSales) => {
-        setSales(updatedSales);
-      });
-      salesSubscriptionRef.current = salesChannel;
-    }
-
-    if (!productsSubscriptionRef.current) {
-      const productsChannel = subscribeToProducts((updatedProducts) => {
-        setProducts(updatedProducts);
-      });
-      productsSubscriptionRef.current = productsChannel;
-    }
-
-    if (!expensesSubscriptionRef.current) {
-      const expensesChannel = subscribeToExpenses((updatedExpenses) => {
-        setExpenses(updatedExpenses);
-      });
-      expensesSubscriptionRef.current = expensesChannel;
-    }
-
-    if (!employeesSubscriptionRef.current) {
-      const employeesChannel = subscribeToEmployees((updatedEmployees) => {
-        setEmployees(updatedEmployees);
-      });
-      employeesSubscriptionRef.current = employeesChannel;
-    }
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      if (salesSubscriptionRef.current) {
-        unsubscribeFromSales(salesSubscriptionRef.current);
-        salesSubscriptionRef.current = null;
-      }
-      if (productsSubscriptionRef.current) {
-        unsubscribeFromProducts(productsSubscriptionRef.current);
-        productsSubscriptionRef.current = null;
-      }
-      if (expensesSubscriptionRef.current) {
-        unsubscribeFromExpenses(expensesSubscriptionRef.current);
-        expensesSubscriptionRef.current = null;
-      }
-      if (employeesSubscriptionRef.current) {
-        unsubscribeFromEmployees(employeesSubscriptionRef.current);
-        employeesSubscriptionRef.current = null;
-      }
-    };
+    setSales([]);
+    setProducts([]);
+    setExpenses([]);
+    setEmployees([]);
+    setIsLoading(false);
   }, []);
 
   const topProducts = React.useMemo(() => {

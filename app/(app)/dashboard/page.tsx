@@ -37,8 +37,6 @@ import {
 import { Avatar, Skeleton } from "@/components/ui/misc";
 import { downloadCSV, formatKES, formatDate } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
-import { getSales as getSupabaseSales, subscribeToSales, unsubscribeFromSales } from "@/lib/api/sales";
-import { getProducts as getSupabaseProducts, subscribeToProducts, unsubscribeFromProducts } from "@/lib/api/products";
 import type { Sale, Product } from "@/types";
 
 export default function DashboardPage() {
@@ -48,54 +46,12 @@ export default function DashboardPage() {
   const [sales, setSales] = React.useState<Sale[]>([]);
   const [products, setProducts] = React.useState<Product[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const salesSubscriptionRef = React.useRef<any>(null);
-  const productsSubscriptionRef = React.useRef<any>(null);
 
   // Fetch data on mount
   React.useEffect(() => {
-    async function fetchData() {
-      try {
-        const [salesData, productsData] = await Promise.all([
-          getSupabaseSales(),
-          getSupabaseProducts()
-        ]);
-        setSales(salesData);
-        setProducts(productsData);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchData();
-
-    // Set up real-time subscriptions (separate from data fetch to avoid duplicate subscriptions)
-    if (!salesSubscriptionRef.current) {
-      const salesChannel = subscribeToSales((updatedSales) => {
-        setSales(updatedSales);
-      });
-      salesSubscriptionRef.current = salesChannel;
-    }
-
-    if (!productsSubscriptionRef.current) {
-      const productsChannel = subscribeToProducts((updatedProducts) => {
-        setProducts(updatedProducts);
-      });
-      productsSubscriptionRef.current = productsChannel;
-    }
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      if (salesSubscriptionRef.current) {
-        unsubscribeFromSales(salesSubscriptionRef.current);
-        salesSubscriptionRef.current = null;
-      }
-      if (productsSubscriptionRef.current) {
-        unsubscribeFromProducts(productsSubscriptionRef.current);
-        productsSubscriptionRef.current = null;
-      }
-    };
+    setSales([]);
+    setProducts([]);
+    setIsLoading(false);
   }, []);
 
   const topProducts = React.useMemo(() => {
@@ -373,7 +329,7 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {topProducts.map((product) => (
                 <div key={product.id} className="flex items-center gap-3">
-                  <ProductThumb category={product.category} className="size-8 shrink-0" />
+                  <ProductThumb category={product.category} imageUrl={product.imageUrl} className="size-8 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-medium">{product.name}</p>
                     <p className="text-[11px] text-muted-foreground">{product.sold} sold</p>

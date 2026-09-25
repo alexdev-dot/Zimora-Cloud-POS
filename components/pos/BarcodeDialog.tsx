@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ScanLine } from "lucide-react";
+import { ScanLine, Camera, Keyboard, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogBody,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatKES } from "@/lib/utils";
 import type { Product } from "@/types";
+import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
 
 export function BarcodeDialog({
   open,
@@ -59,68 +60,56 @@ export function BarcodeDialog({
     }
   }
 
-  function simulateScan() {
-    const inStock = products.filter((p) => p.stock > 0);
-    if (inStock.length === 0) {
-      setError("No products in stock to simulate scan.");
-      return;
-    }
-    const p = inStock[Math.floor(Math.random() * inStock.length)];
-    setValue(p.barcode);
-    onFound(p);
-    onOpenChange(false);
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ScanLine className="size-4 text-primary" /> Scan barcode
           </DialogTitle>
           <DialogDescription>
-            Use a USB/Bluetooth scanner or type a barcode or SKU manually.
+            Use USB/Bluetooth scanner or type barcode manually.
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <Input
-            ref={inputRef}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-              // Most hardware scanners send an Enter keystroke — resolve immediately
-              if (e.key === "Enter" && value.length >= 8) {
-                const p = resolve(value);
-                if (p) {
-                  onFound(p);
-                  onOpenChange(false);
+          <div className="space-y-4">
+            <Input
+              ref={inputRef}
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+                // Most hardware scanners send an Enter keystroke — resolve immediately
+                if (e.key === "Enter" && value.length >= 8) {
+                  const p = resolve(value);
+                  if (p) {
+                    onFound(p);
+                    onOpenChange(false);
+                  }
                 }
-              }
-            }}
-            placeholder="e.g. 5449000000996 or BEV-001"
-            aria-label="Barcode or SKU"
-            aria-invalid={Boolean(error)}
-            autoFocus
-          />
-          {error && (
-            <p role="alert" className="mt-2 text-xs font-medium text-destructive">
-              {error}
+              }}
+              placeholder="e.g. 5449000000996 or BEV-001"
+              aria-label="Barcode or SKU"
+              aria-invalid={Boolean(error)}
+              autoFocus
+            />
+            {error && (
+              <p role="alert" className="mt-2 text-xs font-medium text-destructive">
+                {error}
+              </p>
+            )}
+
+            <p className="mt-3 text-xs text-muted-foreground">
+              {products.length > 0
+                ? `Try any product barcode — for example ${products[0].name} (${products[0].barcode}, ${formatKES(products[0].price)}).`
+                : "No products available. Add products in the Products page."}
             </p>
-          )}
-          <p className="mt-3 text-xs text-muted-foreground">
-            {products.length > 0
-              ? `Try any product barcode — for example ${products[0].name} (${products[0].barcode}, ${formatKES(products[0].price)}).`
-              : "No products available. Add products in the Products page."}
-          </p>
+          </div>
         </DialogBody>
         <DialogFooter>
-          <Button variant="outline" onClick={simulateScan}>
-            <ScanLine /> Simulate scan
-          </Button>
           <Button onClick={submit} disabled={!value.trim()}>
             Add to cart
           </Button>

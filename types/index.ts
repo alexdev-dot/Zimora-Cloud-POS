@@ -1,12 +1,16 @@
 /* ── Core domain types for Zimora Cloud POS ─────────────────────────────── */
 
-export type Category =
-  | "Beverages"
-  | "Food"
-  | "Electronics"
-  | "Household"
-  | "Personal Care"
-  | "Other";
+
+
+// Dynamic category interface for the new database-driven categories
+export interface CategoryEntity {
+  id: string;
+  name: string;
+  description?: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
 
 export type PaymentMethod = "cash" | "mpesa" | "card" | "split";
 export type SaleStatus = "completed" | "pending" | "refunded" | "partially_refunded";
@@ -60,7 +64,7 @@ export interface Product {
   name: string;
   sku: string;
   barcode: string;
-  category: Category;
+  category: string;
   description?: string;
   price: number;
   cost: number;
@@ -71,12 +75,11 @@ export interface Product {
   unit: Unit;
   location: string;
   supplier: string;
-  brand?: string;
   status: ProductStatus;
   updatedAt: string;
   createdAt: string;
   sold: number;
-  image?: string;
+  imageUrl?: string;
 }
 
 export interface SaleItem {
@@ -137,6 +140,8 @@ export interface Employee {
   lastActive: string;
   permissions: PermissionMatrix;
   pin?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface InventoryTransaction {
@@ -269,4 +274,13 @@ export interface CashierPerformance {
   sales: number;
   avgOrder: number;
   refunds: number;
+}
+
+export interface Setting {
+  id: string;
+  key: string;
+  value: string | number | boolean | object;
+  category: string;
+  description?: string;
+  updatedAt: string;
 }

@@ -74,6 +74,7 @@ export function DataTable<T>({
   selectable,
   renderBulkActions,
   mobileCard,
+  rowActions,
   onRowClick,
   stickyHeader,
   defaultSort,
@@ -184,10 +185,12 @@ export function DataTable<T>({
               </Button>
             </div>
           ) : (
-            filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>
-          )}
-          {searchActive && selected.size === 0 && (
-            <SearchInput value={query} onChange={setQuery} placeholder={searchPlaceholder} />
+            <>
+              <div className="flex flex-wrap items-center gap-2">{filters}</div>
+              {searchActive && selected.size === 0 && (
+                <SearchInput value={query} onChange={setQuery} placeholder={searchPlaceholder} />
+              )}
+            </>
           )}
         </div>
       )}
@@ -303,8 +306,8 @@ export function DataTable<T>({
                   key={key}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(
-                    "flex items-start gap-3 p-4 active:bg-muted/40",
-                    onRowClick && "cursor-pointer"
+                    "flex items-start gap-3 p-4 active:bg-muted/40 transition-colors",
+                    onRowClick && "cursor-pointer hover:bg-muted/20"
                   )}
                 >
                   {selectable && (
@@ -335,6 +338,11 @@ export function DataTable<T>({
                       </div>
                     )}
                   </div>
+                  {rowActions && (
+                    <div className="flex shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {rowActions(row)}
+                    </div>
+                  )}
                 </div>
               );
             })}

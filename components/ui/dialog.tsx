@@ -31,7 +31,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 flex max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-pop duration-150 data-[state=open]:animate-scale-in",
+        "fixed left-1/2 top-1/2 z-50 flex max-h-[90dvh] w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-pop duration-150 data-[state=open]:animate-scale-in",
         sizeClasses[size],
         className
       )}
@@ -40,7 +40,7 @@ const DialogContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close
         aria-label="Close dialog"
-        className="focus-ring absolute right-3.5 top-3.5 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="focus-ring absolute right-3 top-3.5 sm:right-3.5 sm:top-3.5 rounded-md p-1.5 sm:p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <X className="size-4" />
       </DialogPrimitive.Close>
@@ -52,21 +52,21 @@ DialogContent.displayName = "DialogContent";
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex flex-col gap-1 border-b border-border px-5 py-4 pr-12", className)}
+      className={cn("flex flex-col gap-1 border-b border-border px-4 py-3.5 sm:px-5 sm:py-4 sm:pr-12", className)}
       {...props}
     />
   );
 }
 
 function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex-1 overflow-y-auto px-5 py-4", className)} {...props} />;
+  return <div className={cn("flex-1 overflow-y-auto px-4 py-3.5 sm:px-5 sm:py-4", className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 border-t border-border bg-muted/30 px-5 py-3.5 sm:flex-row sm:justify-end",
+        "flex flex-col-reverse gap-2 border-t border-border bg-muted/30 px-4 py-3.5 sm:px-5 sm:py-3.5 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

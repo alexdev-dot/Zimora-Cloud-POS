@@ -1,5 +1,10 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { EmployeeAuthProvider } from "@/lib/contexts/EmployeeAuthContext";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <EmployeeAuthProvider>
+      <AppShell>{children}</AppShell>
+    </EmployeeAuthProvider>
+  );
 }

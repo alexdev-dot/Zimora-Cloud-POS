@@ -1,7 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { ThemeProvider } from "@/lib/contexts/ThemeContext";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -30,17 +44,24 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" className="light" suppressHydrationWarning>
-      <body className="font-sans light" suppressHydrationWarning>
-        <ScrollToTop />
-        {children}
-        <Toaster position="bottom-right" gap={8} toastOptions={{
-          classNames: {
-            toast:
-              "!rounded-lg !border-border !bg-card !text-card-foreground !shadow-pop !text-[13px]",
-            description: "!text-muted-foreground",
-          },
-        }} />
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        <noscript>
+          <style>{`* { opacity: 1 !important; transform: none !important; }`}</style>
+        </noscript>
+      </head>
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans`} suppressHydrationWarning>
+        <ThemeProvider>
+          <ScrollToTop />
+          {children}
+          <Toaster position="bottom-right" gap={8} toastOptions={{
+            classNames: {
+              toast:
+                "!rounded-lg !border-border !bg-card !text-card-foreground !shadow-pop !text-[13px]",
+              description: "!text-muted-foreground",
+            },
+          }} />
+        </ThemeProvider>
       </body>
     </html>
   );

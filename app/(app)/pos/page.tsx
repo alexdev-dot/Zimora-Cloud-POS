@@ -10,18 +10,14 @@ import { PaymentDialog, type PaymentResult } from "@/components/pos/PaymentDialo
 import { SuccessModal } from "@/components/pos/SuccessModal";
 import { BarcodeDialog } from "@/components/pos/BarcodeDialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { getProducts as getSupabaseProducts, updateStock, subscribeToProducts, unsubscribeFromProducts } from "@/lib/api/products";
-import { createSale } from "@/lib/api/sales";
-import { applyStockChange } from "@/lib/api/inventory";
 import { cn, formatKES } from "@/lib/utils";
-import type { CartLine, Category, Product, Sale } from "@/types";
+import type { CartLine, Product, Sale } from "@/types";
 
 export default function PosPage() {
   const [catalog, setCatalog] = React.useState<Product[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
   const [cart, setCart] = React.useState<CartLine[]>([]);
   const [search, setSearch] = React.useState("");
-  const [category, setCategory] = React.useState<Category | "All">("All" as Category | "All");
+  const [category, setCategory] = React.useState<string>("All");
   const [customerId, setCustomerId] = React.useState("walkin");
   const [discount, setDiscount] = React.useState("");
   const [paymentOpen, setPaymentOpen] = React.useState(false);
@@ -30,39 +26,6 @@ export default function PosPage() {
   const [lastSale, setLastSale] = React.useState<{ sale: Sale; payment: Partial<PaymentResult> } | null>(null);
   const [orderSeq, setOrderSeq] = React.useState(1);
   const searchRef = React.useRef<HTMLInputElement>(null);
-  const subscriptionRef = React.useRef<any>(null);
-
-  // Fetch products on mount
-  React.useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const data = await getSupabaseProducts();
-        setCatalog(data);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchProducts();
-
-    // Set up real-time subscription (separate from data fetch to avoid duplicate subscriptions)
-    if (!subscriptionRef.current) {
-      const channel = subscribeToProducts((updatedProducts) => {
-        setCatalog(updatedProducts);
-      });
-      subscriptionRef.current = channel;
-    }
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (subscriptionRef.current) {
-        unsubscribeFromProducts(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, []);
 
   /* "/" focuses the product search */
   React.useEffect(() => {
@@ -97,10 +60,12 @@ export default function PosPage() {
       toast.error("Out of stock", { description: `${p.name} is not available right now.` });
       return;
     }
+    
     setCart((prev) => {
       const existing = prev.find((l) => l.product.id === p.id);
       if (existing) {
-        if (existing.qty >= p.stock) {
+        // Check if adding one more would exceed available stock
+        if (existing.qty + 1 > p.stock) {
           toast.warning("Stock limit reached", { description: `Only ${p.stock} units of ${p.name} available.` });
           return prev;
         }
@@ -108,9 +73,9 @@ export default function PosPage() {
       }
       return [...prev, { product: p, qty: 1 }];
     });
+    
     if (!silent) {
       toast.success(`Added ${p.name}`, { duration: 1200 });
-      // Brief highlight handled by cart badge
     }
   }
 
@@ -141,7 +106,7 @@ export default function PosPage() {
     return { subtotal, discount: discountAmount, tax, total: subtotal - discountAmount + tax };
   }, [cart, discount]);
 
-  async function completeSale(payment: PaymentResult) {
+  function completeSale(payment: PaymentResult) {
     const customerName = customerId === "walkin" ? "Walk-in Customer" : "Customer";
 
     const orderNo = `ORD-${orderSeq}`;
@@ -170,34 +135,12 @@ export default function PosPage() {
       status: "completed",
     };
 
-    try {
-      for (const line of cart) {
-        await applyStockChange(
-          line.product.id,
-          -line.qty,
-          'sale',
-          orderNo,
-          "Cashier",
-          `Sale to ${customerName}`
-        );
-      }
-
-      await createSale(sale);
-
-      // Refresh catalog
-      const updated = await getSupabaseProducts();
-      setCatalog(updated);
-
-      setLastSale({ sale, payment });
-      setPaymentOpen(false);
-      setCartSheetOpen(false);
-      setCart([]);
-      setDiscount("");
-      setOrderSeq((n) => n + 1);
-    } catch (error) {
-      console.error('Failed to complete sale:', error);
-      toast.error('Failed to complete sale');
-    }
+    setLastSale({ sale, payment });
+    setPaymentOpen(false);
+    setCartSheetOpen(false);
+    setCart([]);
+    setDiscount("");
+    setOrderSeq((n) => n + 1);
   }
 
   const cartCount = cart.reduce((a, l) => a + l.qty, 0);
@@ -311,6 +254,3 @@ export default function PosPage() {
     </div>
   );
 }
-
-/* Keep the Category import used for type-safety of tabs */
-export type { Category };

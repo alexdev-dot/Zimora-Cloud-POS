@@ -49,7 +49,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
-          "Geist",
+          "var(--font-inter)",
           "ui-sans-serif",
           "system-ui",
           "-apple-system",
@@ -60,7 +60,7 @@ const config: Config = {
           "sans-serif",
         ],
         mono: [
-          "Geist Mono",
+          "var(--font-jetbrains-mono)",
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",

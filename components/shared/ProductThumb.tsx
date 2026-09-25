@@ -1,31 +1,47 @@
-import { CATEGORY_META } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { Category } from "@/types";
 import { Package } from "lucide-react";
 
 /**
  * Consistent visual placeholder for products without photos.
- * Uses a category-tinted tile with the category icon (or initials when a name is given).
+ * Uses a default tile with initials when a name is given.
+ * Displays actual product image when imageUrl is provided.
  */
 export function ProductThumb({
   category,
   name,
+  imageUrl,
   className,
   iconClassName,
 }: {
-  category: Category;
+  category: string;
   name?: string;
+  imageUrl?: string | null;
   className?: string;
   iconClassName?: string;
 }) {
-  const meta = CATEGORY_META[category] || CATEGORY_META.Other;
-  const Icon = meta.icon;
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt={name || category}
+        className={cn(
+          "rounded-lg ring-1 ring-inset ring-slate-200/60 object-cover",
+          className
+        )}
+        onError={(e) => {
+          // Fallback to placeholder if image fails to load
+          e.currentTarget.style.display = 'none';
+          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+        }}
+      />
+    );
+  }
+
   return (
     <span
       aria-hidden
       className={cn(
-        "flex items-center justify-center rounded-lg ring-1 ring-inset",
-        meta.tile,
+        "flex items-center justify-center rounded-lg ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200/60",
         className
       )}
     >
@@ -40,7 +56,7 @@ export function ProductThumb({
             .toUpperCase()}
         </span>
       ) : (
-        <Icon className={cn("size-1/3 max-h-8 max-w-8", iconClassName)} />
+        <Package className={cn("size-1/3 max-h-8 max-w-8", iconClassName)} />
       )}
     </span>
   );

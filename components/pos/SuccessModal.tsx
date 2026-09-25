@@ -11,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { PaymentBadge } from "@/components/shared/StatusBadge";
 import { Receipt, type ReceiptData } from "@/components/pos/Receipt";
-import { downloadBlob, formatKES } from "@/lib/utils";
-import type { Sale } from "@/types";
+import { formatKES, downloadReceiptAsHTML, generateReceiptPDF } from "@/lib/utils";
+import type { Sale, ReceiptSettings } from "@/types";
 
 export function SuccessModal({
   open,
@@ -27,7 +27,25 @@ export function SuccessModal({
   payment: (PaymentDataPlaceholder) | null;
   onNewSale: () => void;
 }) {
+  // Get receipt and invoice settings from localStorage
+  const [receiptSettings] = React.useState<ReceiptSettings>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('zimora-receipt-settings');
+      return saved ? JSON.parse(saved) : { template: 'classic', width: '80mm' };
+    }
+    return { template: 'classic', width: '80mm' };
+  });
+
+  const [invoiceSettings] = React.useState<ReceiptSettings>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('zimora-invoice-settings');
+      return saved ? JSON.parse(saved) : { template: 'professional', width: '80mm' };
+    }
+    return { template: 'professional', width: '80mm' };
+  });
+
   if (!sale) return null;
+
   const receiptData: ReceiptData = {
     orderNo: sale.orderNo,
     date: sale.date,
@@ -45,25 +63,21 @@ export function SuccessModal({
     splits: payment?.splits,
   };
 
-  function downloadReceipt() {
-    const rows = receiptData.items
-      .map(
-        (i) =>
-          `<tr><td>${i.name} &times; ${i.qty}</td><td style="text-align:right">KSh ${(i.qty * i.unitPrice).toLocaleString()}</td></tr>`
-      )
-      .join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${sale!.orderNo}</title>
-<style>body{font-family:ui-monospace,monospace;max-width:360px;margin:24px auto;color:#111}table{width:100%;border-collapse:collapse}td{padding:2px 0}.total{font-size:18px;font-weight:bold;border-top:2px solid #111;padding-top:6px}h2{text-align:center;margin:0}p{text-align:center;color:#555;font-size:12px;margin:2px 0}</style>
-</head><body><h2>Zimora Supermarket</h2><p>Shop L23, Sarit Centre, Westlands, Nairobi · Tel +254 720 000 111</p>
-<hr/><p>Receipt <b>${sale!.orderNo}</b> · ${new Date(sale!.date).toLocaleString()}<br/>Served by ${sale!.cashier}</p><hr/>
-<table>${rows}</table><hr/>
-<table><tr><td>Subtotal</td><td style="text-align:right">KSh ${sale!.subtotal.toLocaleString()}</td></tr>
-${sale!.discount ? `<tr><td>Discount</td><td style="text-align:right">−KSh ${sale!.discount.toLocaleString()}</td></tr>` : ""}
-<tr><td>VAT (16%)</td><td style="text-align:right">KSh ${sale!.tax.toLocaleString()}</td></tr>
-<tr class="total"><td>TOTAL</td><td style="text-align:right">KSh ${sale!.total.toLocaleString()}</td></tr></table>
-<hr/><p>Karibu tena! For feedback call +254 720 000 111.<br/>Powered by Zimora Cloud POS</p></body></html>`;
-    downloadBlob(`receipt-${sale!.orderNo}.html`, html, "text/html");
-    toast.success("Receipt downloaded", { description: `receipt-${sale!.orderNo}.html` });
+  function downloadReceipt(format: "html" | "pdf" = "html", documentType: "receipt" | "invoice" = "receipt") {
+    const settings = documentType === "invoice" ? invoiceSettings : receiptSettings;
+    
+    if (format === "pdf") {
+      generateReceiptPDF(receiptData, documentType).then((fileName) => {
+        toast.success(`${documentType === "invoice" ? "Invoice" : "Receipt"} downloaded`, { 
+          description: fileName 
+        });
+      });
+    } else {
+      const fileName = downloadReceiptAsHTML(receiptData, documentType);
+      toast.success(`${documentType === "invoice" ? "Invoice" : "Receipt"} downloaded`, { 
+        description: fileName 
+      });
+    }
   }
 
   return (
@@ -90,16 +104,22 @@ ${sale!.discount ? `<tr><td>Discount</td><td style="text-align:right">−KSh ${s
 
         <div className="max-h-[46vh] overflow-y-auto bg-muted/40 px-5 py-5">
           <div className="print-area">
-            <Receipt data={receiptData} />
+            <Receipt data={receiptData} settings={receiptSettings} documentType="receipt" />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/30 p-4 max-sm:grid-cols-1">
+        <div className="grid grid-cols-3 gap-2 border-t border-border bg-muted/30 p-4 max-sm:grid-cols-2">
           <Button variant="outline" onClick={() => window.print()}>
-            <Printer /> Print receipt
+            <Printer /> Print
           </Button>
-          <Button variant="outline" onClick={downloadReceipt}>
-            <Download /> Download receipt
+          <Button variant="outline" onClick={() => downloadReceipt("html", "receipt")}>
+            <Download /> HTML
+          </Button>
+          <Button variant="outline" onClick={() => downloadReceipt("pdf", "receipt")}>
+            <Download /> PDF
+          </Button>
+          <Button variant="outline" onClick={() => downloadReceipt("html", "invoice")}>
+            <Download /> Invoice
           </Button>
           <Button
             variant="outline"
@@ -119,7 +139,7 @@ ${sale!.discount ? `<tr><td>Discount</td><td style="text-align:right">−KSh ${s
               })
             }
           >
-            <MessageCircle /> Send SMS
+            <MessageCircle /> SMS
           </Button>
         </div>
         <div className="border-t border-border p-4">

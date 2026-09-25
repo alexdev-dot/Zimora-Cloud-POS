@@ -41,8 +41,6 @@ import {
 import { FormField, Input, Textarea } from "@/components/ui/input";
 import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { stockStatusOf } from "@/lib/utils/products";
-import { getProducts as getSupabaseProducts, updateStock, subscribeToProducts, unsubscribeFromProducts } from "@/lib/api/products";
-import { getInventoryTransactions, createInventoryTransaction, applyStockChange, subscribeToInventoryTransactions, unsubscribeFromInventoryTransactions } from "@/lib/api/inventory";
 import { branches } from "@/lib/constants";
 
 import { formatKES, formatDate, uid } from "@/lib/utils";
@@ -70,8 +68,6 @@ function InventoryInner() {
   const [action, setAction] = React.useState<StockAction | null>(null);
   const [countOpen, setCountOpen] = React.useState(false);
   const [receiveTarget, setReceiveTarget] = React.useState<Product | null>(null);
-  const productsSubscriptionRef = React.useRef<any>(null);
-  const transactionsSubscriptionRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     if (params.get("action") === "receive") setAction("receive");
@@ -81,49 +77,9 @@ function InventoryInner() {
 
   // Fetch data on mount
   React.useEffect(() => {
-    async function fetchData() {
-      try {
-        const [productsData, txData] = await Promise.all([
-          getSupabaseProducts(),
-          getInventoryTransactions()
-        ]);
-        setItems(productsData);
-        setTransactions(txData);
-      } catch (error) {
-        console.error('Error fetching inventory data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchData();
-
-    // Set up real-time subscriptions (separate from data fetch to avoid duplicate subscriptions)
-    if (!productsSubscriptionRef.current) {
-      const productsChannel = subscribeToProducts((updatedProducts) => {
-        setItems(updatedProducts);
-      });
-      productsSubscriptionRef.current = productsChannel;
-    }
-
-    if (!transactionsSubscriptionRef.current) {
-      const transactionsChannel = subscribeToInventoryTransactions((updatedTransactions) => {
-        setTransactions(updatedTransactions);
-      });
-      transactionsSubscriptionRef.current = transactionsChannel;
-    }
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      if (productsSubscriptionRef.current) {
-        unsubscribeFromProducts(productsSubscriptionRef.current);
-        productsSubscriptionRef.current = null;
-      }
-      if (transactionsSubscriptionRef.current) {
-        unsubscribeFromInventoryTransactions(transactionsSubscriptionRef.current);
-        transactionsSubscriptionRef.current = null;
-      }
-    };
+    setItems([]);
+    setTransactions([]);
+    setIsLoading(false);
   }, []);
 
   const totals = React.useMemo(() => {
@@ -149,64 +105,28 @@ function InventoryInner() {
     [items, statusFilter, locationFilter]
   );
 
-  async function applyTransaction(
-    tx: Omit<InventoryTransaction, "id" | "date" | "createdBy">,
-    product: Product,
-    newStock: number
-  ) {
-    try {
-      await applyStockChange(
-        product.id,
-        tx.qty,
-        tx.type,
-        tx.reference || '',
-        "Current User",
-        tx.note
-      );
-      
-      // Refresh data
-      const [updatedProducts, updatedTx] = await Promise.all([
-        getSupabaseProducts(),
-        getInventoryTransactions()
-      ]);
-      setItems(updatedProducts);
-      setTransactions(updatedTx);
-
-      toast.success('Stock updated successfully');
-    } catch (error) {
-      console.error('Failed to update stock:', error);
-      toast.error('Failed to update stock');
-    }
-  }
-
-  // Reusable function for stock updates (used by both applyTransaction and StockActionDialog)
-  async function handleStockUpdate(
+  function handleStockUpdate(
     tx: Omit<InventoryTransaction, "id" | "date" | "createdBy">,
     product: Product
   ) {
-    try {
-      await applyStockChange(
-        product.id,
-        tx.qty,
-        tx.type,
-        tx.reference || '',
-        "Current User",
-        tx.note
-      );
-      
-      // Refresh data
-      const [updatedProducts, updatedTx] = await Promise.all([
-        getSupabaseProducts(),
-        getInventoryTransactions()
-      ]);
-      setItems(updatedProducts);
-      setTransactions(updatedTx);
-
-      toast.success('Stock updated successfully');
-    } catch (error) {
-      console.error('Failed to update stock:', error);
-      toast.error('Failed to update stock');
-    }
+    // Local operation - update state directly
+    setItems(prev => prev.map(p => p.id === product.id ? { ...p, stock: p.stock + tx.qty } : p));
+    const newTx: InventoryTransaction = {
+      id: uid("tx"),
+      date: new Date().toISOString(),
+      productId: product.id,
+      productName: product.name,
+      sku: product.sku,
+      qty: tx.qty,
+      type: tx.type,
+      previousStock: product.stock,
+      newStock: product.stock + tx.qty,
+      createdBy: "Current User",
+      reference: tx.reference || '',
+      note: tx.note
+    };
+    setTransactions(prev => [newTx, ...prev]);
+    toast.success('Stock updated successfully');
   }
 
   const columns: ColumnDef<Product>[] = [
@@ -217,7 +137,7 @@ function InventoryInner() {
       sortable: true,
       cell: (r) => (
         <div className="flex items-center gap-3">
-          <ProductThumb category={r.category} className="size-9 shrink-0" />
+          <ProductThumb category={r.category} imageUrl={r.imageUrl} className="size-9 shrink-0" />
           <div className="min-w-0">
             <p className="max-w-[200px] truncate font-medium">{r.name}</p>
             <p className="font-mono text-[11px] text-muted-foreground">{r.sku}</p>
@@ -384,7 +304,7 @@ function InventoryInner() {
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <MetricCard
           loading={loading}
           label="Total Stock Value"
@@ -477,7 +397,7 @@ function InventoryInner() {
             mobileCard={(r) => (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2.5">
-                  <ProductThumb category={r.category} className="size-10 shrink-0" />
+                  <ProductThumb category={r.category} imageUrl={r.imageUrl} className="size-10 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-medium">{r.name}</p>
                     <p className="font-mono text-[11px] text-muted-foreground">{r.sku}</p>

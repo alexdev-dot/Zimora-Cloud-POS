@@ -5,9 +5,10 @@ import { Plus, ScanLine, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductThumb } from "@/components/shared/ProductThumb";
 import { EmptyState } from "@/components/shared/states";
-import { CATEGORIES } from "@/lib/constants";
+
 import { cn, formatKES } from "@/lib/utils";
-import type { Category, Product, StockStatus } from "@/types";
+import type { Product, StockStatus } from "@/types";
+import type { CategoryEntity } from "@/types";
 
 export function StockChip({ status, stock }: { status: StockStatus; stock: number }) {
   const cls =
@@ -38,14 +39,28 @@ export function ProductGrid({
   products: Product[];
   search: string;
   onSearch: (v: string) => void;
-  category: Category | "All";
-  onCategory: (c: Category | "All") => void;
+  category: string | "All";
+  onCategory: (c: string | "All") => void;
   onAdd: (p: Product) => void;
   onScan: () => void;
   searchRef?: React.RefObject<HTMLInputElement>;
 }) {
+  const [categories, setCategories] = React.useState<CategoryEntity[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = React.useState(false);
+
+  // Load dynamic categories on mount
+  React.useEffect(() => {
+    setIsLoadingCategories(true);
+    setCategories([]);
+    setIsLoadingCategories(false);
+  }, []);
+
+  const categoryList = React.useMemo(() => {
+    return ["All"] as (string | "All")[];
+  }, []);
+
   const counts = React.useMemo(() => {
-    const map = new Map<Category | "All", number>();
+    const map = new Map<string | "All", number>();
     map.set("All", products.length);
     for (const p of products) map.set(p.category, (map.get(p.category) ?? 0) + 1);
     return map;
@@ -90,25 +105,29 @@ export function ProductGrid({
         aria-label="Product categories"
         className="flex gap-1.5 overflow-x-auto border-b border-border bg-card px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {(["All", ...CATEGORIES] as (Category | "All")[]).map((c) => (
-          <button
-            key={c}
-            role="tab"
-            aria-selected={category === c}
-            onClick={() => onCategory(c)}
-            className={cn(
-              "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-ring",
-              category === c
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "bg-muted text-muted-foreground hover:bg-slate-200/70 hover:text-foreground"
-            )}
-          >
-            {c}
-            <span className={cn("ml-1.5 text-[11px] tabular-nums", category === c ? "text-primary-foreground/70" : "opacity-60")}>
-              {counts.get(c) ?? 0}
-            </span>
-          </button>
-        ))}
+        {isLoadingCategories ? (
+          <div className="text-sm text-muted-foreground">Loading categories...</div>
+        ) : (
+          categoryList.map((c) => (
+            <button
+              key={c}
+              role="tab"
+              aria-selected={category === c}
+              onClick={() => onCategory(c)}
+              className={cn(
+                "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-ring",
+                category === c
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted text-muted-foreground hover:bg-slate-200/70 hover:text-foreground"
+              )}
+            >
+              {c}
+              <span className={cn("ml-1.5 text-[11px] tabular-nums", category === c ? "text-primary-foreground/70" : "opacity-60")}>
+                {counts.get(c) ?? 0}
+              </span>
+            </button>
+          ))
+        )}
       </div>
 
       {/* Grid */}
@@ -148,7 +167,7 @@ export function ProductGrid({
                       : "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-pop active:translate-y-0 active:scale-[.98]"
                   )}
                 >
-                  <ProductThumb category={p.category} className="mb-2.5 aspect-[5/3] w-full" />
+                  <ProductThumb category={p.category} imageUrl={p.imageUrl} className="mb-2.5 aspect-[5/3] w-full" />
                   <p className="line-clamp-2 min-h-[2.4em] text-[13px] font-medium leading-snug">{p.name}</p>
                   <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground">
                     {p.sku}

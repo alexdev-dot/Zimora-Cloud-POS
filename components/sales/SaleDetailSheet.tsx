@@ -20,8 +20,8 @@ import { ProductThumb } from "@/components/shared/ProductThumb";
 import { Receipt } from "@/components/pos/Receipt";
 import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { productById } from "@/lib/utils/products";
-import { formatKES, formatDate } from "@/lib/utils";
-import type { Sale, Product } from "@/types";
+import { formatKES, formatDate, downloadReceiptAsHTML, generateReceiptPDF } from "@/lib/utils";
+import type { Sale, Product, ReceiptSettings } from "@/types";
 
 export function SaleDetailSheet({
   sale,
@@ -36,9 +36,57 @@ export function SaleDetailSheet({
 }) {
   const [refundOpen, setRefundOpen] = React.useState(false);
 
+  // Get receipt and invoice settings from localStorage
+  const [receiptSettings] = React.useState<ReceiptSettings>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('zimora-receipt-settings');
+      return saved ? JSON.parse(saved) : { template: 'classic', width: '80mm' };
+    }
+    return { template: 'classic', width: '80mm' };
+  });
+
+  const [invoiceSettings] = React.useState<ReceiptSettings>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('zimora-invoice-settings');
+      return saved ? JSON.parse(saved) : { template: 'professional', width: '80mm' };
+    }
+    return { template: 'professional', width: '80mm' };
+  });
+
   React.useEffect(() => setRefundOpen(false), [sale]);
 
   if (!sale) return null;
+
+  const receiptData = {
+    orderNo: sale.orderNo,
+    date: sale.date,
+    cashier: sale.cashier,
+    customerName: sale.customerName,
+    items: sale.items.map((i) => ({ name: i.name, qty: i.qty, unitPrice: i.unitPrice })),
+    subtotal: sale.subtotal,
+    discount: sale.discount,
+    tax: sale.tax,
+    total: sale.total,
+    paymentMethod: sale.paymentMethod,
+    paymentRef: sale.paymentRef,
+  };
+
+  function downloadReceipt(format: "html" | "pdf" = "html", documentType: "receipt" | "invoice" = "receipt") {
+    const settings = documentType === "invoice" ? invoiceSettings : receiptSettings;
+    
+    if (format === "pdf") {
+      generateReceiptPDF(receiptData, documentType).then((fileName) => {
+        toast.success(`${documentType === "invoice" ? "Invoice" : "Receipt"} downloaded`, { 
+          description: fileName 
+        });
+      });
+    } else {
+      const fileName = downloadReceiptAsHTML(receiptData, documentType);
+      toast.success(`${documentType === "invoice" ? "Invoice" : "Receipt"} downloaded`, { 
+        description: fileName 
+      });
+    }
+  }
   const refundable = sale.status === "completed" || sale.status === "partially_refunded";
 
   return (
@@ -100,7 +148,7 @@ export function SaleDetailSheet({
                 const p = productById(item.productId, products);
                 return (
                   <li key={i} className="flex items-center gap-3 px-3 py-2.5">
-                    {p && <ProductThumb category={p.category} className="size-8 shrink-0" />}
+                    {p && <ProductThumb category={p.category} imageUrl={p.imageUrl} className="size-8 shrink-0" />}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium">{item.name}</p>
                       <p className="text-[11px] text-muted-foreground tabular-nums">
@@ -146,36 +194,39 @@ export function SaleDetailSheet({
             </h4>
             <div className="rounded-lg bg-muted/40 p-4">
               <div className="print-area">
-                <Receipt
-                  data={{
-                    orderNo: sale.orderNo,
-                    date: sale.date,
-                    cashier: sale.cashier,
-                    customerName: sale.customerName,
-                    items: sale.items.map((i) => ({ name: i.name, qty: i.qty, unitPrice: i.unitPrice })),
-                    subtotal: sale.subtotal,
-                    discount: sale.discount,
-                    tax: sale.tax,
-                    total: sale.total,
-                    paymentMethod: sale.paymentMethod,
-                    paymentRef: sale.paymentRef,
-                  }}
-                />
+                <Receipt data={receiptData} settings={receiptSettings} documentType="receipt" />
+              </div>
+            </div>
+          </div>
+
+          {/* Invoice (printable) */}
+          <div>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Invoice preview
+            </h4>
+            <div className="rounded-lg bg-muted/40 p-4">
+              <div className="print-area">
+                <Receipt data={receiptData} settings={invoiceSettings} documentType="invoice" />
               </div>
             </div>
           </div>
         </SheetBody>
 
-        <SheetFooter className="grid grid-cols-3 gap-2">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer /> Print
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => toast.success("Preparing PDF", { description: `${sale.orderNo} receipt will download shortly.` })}
-          >
-            <Download /> PDF
-          </Button>
+        <SheetFooter className="space-y-2">
+          <div className="grid grid-cols-4 gap-2">
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer /> Print
+            </Button>
+            <Button variant="outline" onClick={() => downloadReceipt("html", "receipt")}>
+              <Download /> HTML
+            </Button>
+            <Button variant="outline" onClick={() => downloadReceipt("pdf", "receipt")}>
+              <Download /> PDF
+            </Button>
+            <Button variant="outline" onClick={() => downloadReceipt("html", "invoice")}>
+              <Download /> Invoice
+            </Button>
+          </div>
           <Button
             variant={refundable ? "destructive" : "outline"}
             disabled={!refundable}

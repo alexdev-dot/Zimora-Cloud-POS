@@ -7,14 +7,14 @@ const baseField =
 
 const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, type = "text", ...props }, ref) => (
-    <input type={type} ref={ref} className={cn(baseField, "h-9 min-h-[44px] px-3 sm:h-9 sm:min-h-0", className)} {...props} suppressHydrationWarning />
+    <input type={type} ref={ref} className={cn(baseField, "h-10 min-h-[44px] px-3.5 sm:h-9 sm:min-h-0 sm:px-3", className)} {...props} suppressHydrationWarning />
   )
 );
 Input.displayName = "Input";
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
   ({ className, ...props }, ref) => (
-    <textarea ref={ref} className={cn(baseField, "min-h-[88px] px-3 py-2 sm:min-h-[72px]", className)} {...props} suppressHydrationWarning />
+    <textarea ref={ref} className={cn(baseField, "min-h-[96px] px-3.5 py-2.5 sm:min-h-[72px] sm:px-3 sm:py-2", className)} {...props} suppressHydrationWarning />
   )
 );
 Textarea.displayName = "Textarea";
@@ -38,7 +38,7 @@ function NativeSelect({
       <select
         className={cn(
           baseField,
-          "h-9 min-h-[44px] appearance-none pl-3 pr-8 sm:h-9 sm:min-h-0 [&>option]:bg-card",
+          "h-10 min-h-[44px] appearance-none pl-3.5 pr-8 sm:h-9 sm:min-h-0 sm:pl-3 [&>option]:bg-card",
           className
         )}
         {...props}

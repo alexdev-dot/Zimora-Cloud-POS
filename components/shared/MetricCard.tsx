@@ -40,20 +40,20 @@ export function MetricCard({
   const DeltaIcon = up ? ArrowUpRight : (change?.value ?? 0) < 0 ? ArrowDownRight : Minus;
 
   return (
-    <Card className={cn("p-5", className)}>
+    <Card className={cn("p-4 sm:p-5", className)}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1.5">
+        <div className="min-w-0 space-y-1.5 flex-1">
           <p className="truncate text-[13px] font-medium text-muted-foreground">{label}</p>
           {loading ? (
             <Skeleton className="h-7 w-28" />
           ) : (
-            <p className="text-[26px] font-semibold leading-none tracking-tight tabular-nums">
+            <p className="text-[22px] sm:text-[26px] font-semibold leading-none tracking-tight tabular-nums">
               {value}
             </p>
           )}
         </div>
-        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", iconTones[iconTone])}>
-          <Icon className="size-[18px]" />
+        <span className={cn("flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-lg", iconTones[iconTone])}>
+          <Icon className="size-[16px] sm:size-[18px]" />
         </span>
       </div>
       {change && !loading && (
@@ -70,7 +70,7 @@ export function MetricCard({
           <span className="text-muted-foreground">{change.caption}</span>
         </div>
       )}
-      {footer && <div className="mt-3">{footer}</div>}
+      {footer && <div className="mt-3 text-xs sm:text-[13px]">{footer}</div>}
     </Card>
   );
 }

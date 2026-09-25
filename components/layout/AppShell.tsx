@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <DialogPrimitive.Portal>
               <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-950/40 data-[state=open]:animate-fade-in lg:hidden" />
               <DialogPrimitive.Content
-                className="fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-slate-200 bg-white shadow-pop outline-none data-[state=open]:animate-slide-in-right [animation-direction:reverse] lg:hidden"
+                className="fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-slate-200 bg-white shadow-pop outline-none data-[state=open]:animate-slide-in-right [animation-direction:reverse] lg:hidden dark:border-border dark:bg-background"
                 aria-describedby={undefined}
               >
                 <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <X className="size-4" />
                 </DialogPrimitive.Close>
-                <div className="flex h-[60px] shrink-0 items-center gap-2.5 border-b border-slate-100 px-4">
+                <div className="flex h-[60px] shrink-0 items-center gap-2.5 border-b border-slate-100 px-4 dark:border-border">
                   <BrandMark />
                   <span className="text-[15px] font-semibold tracking-tight">Zimora Cloud POS</span>
                 </div>

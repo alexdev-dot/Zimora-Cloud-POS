@@ -200,7 +200,7 @@ export default function LandingPage() {
         style={{ y: navY, opacity: navOpacity, boxShadow: navShadow ? `0 1px 3px rgba(0,0,0,${navShadow})` : 'none' }}
         className="sticky top-0 z-50 bg-navy border-b border-slate-200 backdrop-blur-sm"
       >
-        <div className="container mx-auto flex h-24 items-center justify-between px-6 lg:px-8">
+        <div className="container mx-auto flex h-16 md:h-20 lg:h-24 items-center justify-between px-4 md:px-6 lg:px-8">
           <Link
             href="/"
             className="flex items-center"
@@ -213,6 +213,7 @@ export default function LandingPage() {
               height={447}
               className="h-16 md:h-20 w-auto object-contain"
               priority
+              loading="eager"
             />
           </Link>
           <div className="flex items-center gap-6">
@@ -420,43 +421,6 @@ export default function LandingPage() {
                   </motion.div>
                 </Link>
               </motion.div>
-
-              {/* Trust Indicators - Unique Layout */}
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7, duration: 0.6 }}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-6"
-              >
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="h-5 w-5 text-primary" />
-                    <span className="text-2xl font-bold text-slate-900">10K+</span>
-                  </div>
-                  <span className="text-sm text-slate-600">Active Users</span>
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Building2 className="h-5 w-5 text-emerald-600" />
-                    <span className="text-2xl font-bold text-slate-900">500+</span>
-                  </div>
-                  <span className="text-sm text-slate-600">Locations</span>
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                    <span className="text-2xl font-bold text-slate-900">4.9</span>
-                  </div>
-                  <span className="text-sm text-slate-600">User Rating</span>
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-5 w-5 text-amber-500" />
-                    <span className="text-2xl font-bold text-slate-900">99.9%</span>
-                  </div>
-                  <span className="text-sm text-slate-600">Uptime</span>
-                </div>
-              </motion.div>
             </motion.div>
             
             {/* Right Side - Hardware Image */}
@@ -588,43 +552,26 @@ export default function LandingPage() {
               </ul>
             </ScrollReveal>
             <ScrollReveal variants={fadeInRight}>
-              <div className="bg-white rounded-2xl p-8 lg:p-12 shadow-sm border border-slate-200">
-                <div className="space-y-8">
-                  <motion.div 
-                    className="text-center"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-primary mb-2">
-                      <AnimatedCounter end={10000} duration={2.5} suffix="+" />
-                    </div>
-                    <div className="text-sm sm:text-base text-slate-600">Active Businesses</div>
-                  </motion.div>
-                  <div className="grid grid-cols-2 gap-8">
-                    <motion.div 
-                      className="text-center"
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      <div className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1">99.9%</div>
-                      <div className="text-sm text-slate-600">Uptime</div>
-                    </motion.div>
-                    <motion.div 
-                      className="text-center"
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: 0.4 }}
-                    >
-                      <div className="text-2xl sm:text-3xl font-bold text-slate-900 mb-1">24/7</div>
-                      <div className="text-sm text-slate-600">Support</div>
-                    </motion.div>
-                  </div>
-                </div>
+              <div className="relative rounded-2xl overflow-hidden shadow-lg border border-slate-200">
+                <Image
+                  src="/images/supermarket.jpg"
+                  alt="Supermarket using Zimora Cloud POS system"
+                  width={800}
+                  height={600}
+                  className="h-auto w-full object-cover"
+                  priority
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3 }}
+                  className="absolute top-1/2 -translate-y-1/2 left-6 w-1/2 max-w-sm bg-primary backdrop-blur-sm rounded-xl p-6 shadow-xl"
+                >
+                  <p className="text-white text-base sm:text-lg font-semibold leading-relaxed">
+                    From small kiosk to large supermarket. Zimora Cloud POS helps business grow.
+                  </p>
+                </motion.div>
               </div>
             </ScrollReveal>
           </div>
@@ -636,10 +583,10 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 lg:px-8">
           <ScrollReveal className="text-center mb-16">
             <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-slate-900">
-              Choose Your Plan
+              Simple, Transparent Pricing
             </h2>
             <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto mb-6">
-              Select the subscription that fits your business needs
+              Select the subscription that fits your business needs. Upgrade anytime
             </p>
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -750,8 +697,9 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 md:py-24 lg:py-28 bg-primary text-white">
-        <ScrollReveal className="container mx-auto px-6 lg:px-8 text-center">
+      <section className="py-12 md:py-16 lg:py-20 relative bg-cover bg-center bg-no-repeat text-white" style={{ backgroundImage: "url('/images/cta.png')" }}>
+        <div className="absolute inset-0 bg-primary/80"></div>
+        <ScrollReveal className="container mx-auto px-6 lg:px-8 text-center relative z-10">
           <motion.h2 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -823,6 +771,7 @@ export default function LandingPage() {
                   height={447}
                   className="h-16 w-auto object-contain"
                   priority
+                  loading="eager"
                 />
               </div>
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-6">

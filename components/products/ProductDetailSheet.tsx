@@ -36,11 +36,11 @@ export function ProductDetailSheet({
       <SheetContent className="sm:max-w-md">
         <SheetHeader>
           <div className="flex items-center gap-3">
-            <ProductThumb category={product.category} className="size-14 text-xl" />
+            <ProductThumb category={product.category} imageUrl={product.imageUrl} className="size-14 text-xl" />
             <div className="min-w-0">
               <SheetTitle className="truncate">{product.name}</SheetTitle>
               <SheetDescription className="font-mono">
-                {product.sku} · {product.brand ?? "Generic"}
+                {product.sku}
               </SheetDescription>
               <div className="mt-1.5 flex gap-1.5">
                 <StatusBadge status={status} dot />

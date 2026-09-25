@@ -86,10 +86,8 @@ export function PaymentBadge({ method, className }: { method: PaymentMethod; cla
 
 export const ROLE_BADGE: Record<string, string> = {
   Owner: "bg-violet-50 text-violet-700 ring-1 ring-violet-200/60",
-  Administrator: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/60",
   Manager: "bg-teal-50 text-teal-700 ring-1 ring-teal-200/60",
   Cashier: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
-  "Inventory Manager": "bg-amber-50 text-amber-800 ring-1 ring-amber-200/60",
 };
 
 export function RoleBadge({ role }: { role: string }) {

@@ -68,7 +68,7 @@ export default function HelpSupportPage() {
     {
       id: 6,
       question: "How do I manage user permissions?",
-      answer: "Go to Settings → Users & Roles → Create new user or edit existing → Assign role (Owner, Administrator, Manager, Cashier) → Configure specific permissions → Save changes.",
+      answer: "Go to Settings → Users & Roles → Create new user or edit existing → Assign role (Owner, Manager, Cashier) → Configure specific permissions → Save changes.",
       category: "users",
       popular: false,
     },

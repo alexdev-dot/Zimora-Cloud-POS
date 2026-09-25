@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { NAV_GROUPS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "@/components/ui/misc";
+import { useEmployeeAuth } from "@/lib/contexts/EmployeeAuthContext";
 
 export function BrandMark({ className, collapsed = false }: { className?: string; collapsed?: boolean }) {
   return (
@@ -15,6 +16,7 @@ export function BrandMark({ className, collapsed = false }: { className?: string
       alt="Zimora Cloud POS"
       width={558}
       height={447}
+      loading="eager"
       className={cn(
         "shrink-0 object-contain transition-all duration-300",
         collapsed ? "h-8 w-auto" : "h-12 w-auto",
@@ -26,16 +28,29 @@ export function BrandMark({ className, collapsed = false }: { className?: string
 
 export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { currentEmployee, isAuthenticated } = useEmployeeAuth();
 
   const isActive = (href: string) =>
     href === "/pos" || href === "/settings"
       ? pathname === href || pathname.startsWith(href + "/")
       : pathname === href || pathname.startsWith(href + "/");
 
+  // Filter navigation items based on employee authentication
+  const filteredNavGroups = React.useMemo(() => {
+    if (!isAuthenticated || !currentEmployee) {
+      // If not authenticated, hide Terminal link
+      return NAV_GROUPS.map(group => ({
+        ...group,
+        items: group.items.filter(item => item.href !== "/terminal")
+      })).filter(group => group.items.length > 0);
+    }
+    return NAV_GROUPS;
+  }, [isAuthenticated, currentEmployee]);
+
   return (
     <nav aria-label="Main navigation" className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4 pb-8">
-        {NAV_GROUPS.map((group) => (
+        {filteredNavGroups.map((group) => (
           <div key={group.title}>
             {!collapsed && (
               <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
@@ -51,7 +66,7 @@ export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: bool
                     <Icon
                       className={cn(
                         "size-[17px] shrink-0",
-                        active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-slate-700"
+                        active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-slate-700 dark:group-hover:text-foreground"
                       )}
                     />
                     {!collapsed && item.label}
@@ -76,7 +91,7 @@ export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: bool
                             collapsed ? "justify-center px-2" : "",
                             active
                               ? "bg-primary text-primary-foreground shadow-sm"
-                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
                           )}
                         >
                           {linkContent}
@@ -92,7 +107,7 @@ export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: bool
                           collapsed ? "justify-center px-2" : "",
                           active
                             ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
                         )}
                       >
                         {linkContent}

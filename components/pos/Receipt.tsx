@@ -82,6 +82,7 @@ export function Receipt({
                   width={558}
                   height={447}
                   className="size-full object-contain"
+                  loading="eager"
                 />
               </div>
             )}
@@ -136,6 +137,7 @@ export function Receipt({
                 width={558}
                 height={447}
                 className="size-full object-contain"
+                loading="eager"
               />
             </div>
           )}

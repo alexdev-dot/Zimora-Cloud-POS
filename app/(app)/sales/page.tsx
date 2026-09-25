@@ -21,8 +21,6 @@ import {
 import { Avatar } from "@/components/ui/misc";
 import { downloadCSV, formatKES, formatDate } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
-import { getSales as getSupabaseSales, updateSale, subscribeToSales, unsubscribeFromSales } from "@/lib/api/sales";
-import { getProducts as getSupabaseProducts, subscribeToProducts, unsubscribeFromProducts } from "@/lib/api/products";
 import type { Sale, Product } from "@/types";
 
 export default function SalesPage() {
@@ -43,8 +41,6 @@ function SalesInner() {
   const [cashier, setCashier] = React.useState("all");
   const [branch, setBranch] = React.useState("all");
   const [detail, setDetail] = React.useState<Sale | null>(null);
-  const salesSubscriptionRef = React.useRef<any>(null);
-  const productsSubscriptionRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     const order = params.get("order");
@@ -56,47 +52,8 @@ function SalesInner() {
   }, [rows]);
 
   React.useEffect(() => {
-    async function fetchData() {
-      try {
-        const [salesData, productsData] = await Promise.all([
-          getSupabaseSales(),
-          getSupabaseProducts()
-        ]);
-        setRows(salesData);
-        setProducts(productsData);
-      } catch (error) {
-        console.error('Error fetching sales data:', error);
-      }
-    }
-
-    fetchData();
-
-    // Set up real-time subscriptions (separate from data fetch to avoid duplicate subscriptions)
-    if (!salesSubscriptionRef.current) {
-      const salesChannel = subscribeToSales((updatedSales) => {
-        setRows(updatedSales);
-      });
-      salesSubscriptionRef.current = salesChannel;
-    }
-
-    if (!productsSubscriptionRef.current) {
-      const productsChannel = subscribeToProducts((updatedProducts) => {
-        setProducts(updatedProducts);
-      });
-      productsSubscriptionRef.current = productsChannel;
-    }
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      if (salesSubscriptionRef.current) {
-        unsubscribeFromSales(salesSubscriptionRef.current);
-        salesSubscriptionRef.current = null;
-      }
-      if (productsSubscriptionRef.current) {
-        unsubscribeFromProducts(productsSubscriptionRef.current);
-        productsSubscriptionRef.current = null;
-      }
-    };
+    setRows([]);
+    setProducts([]);
   }, []);
 
   const filtered = React.useMemo(
@@ -122,15 +79,10 @@ function SalesInner() {
     };
   }, [filtered]);
 
-  async function refund(sale: Sale) {
-    try {
-      await updateSale(sale.id, { status: "refunded" });
-      // Real-time subscription will update the rows
-      toast.success("Sale refunded", { description: `${sale.orderNo} has been refunded.` });
-    } catch (error) {
-      console.error('Failed to refund sale:', error);
-      toast.error('Failed to refund sale');
-    }
+  function refund(sale: Sale) {
+    // Local operation - update state directly
+    setRows(prev => prev.map(s => s.id === sale.id ? { ...s, status: "refunded" } : s));
+    toast.success("Sale refunded", { description: `${sale.orderNo} has been refunded.` });
   }
 
   function exportCsv() {
@@ -230,7 +182,7 @@ function SalesInner() {
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <MetricCard loading={loading} label="Sales (filtered)" value={formatKES(stats.revenue)} icon={ReceiptText} />
         <MetricCard loading={loading} label="Orders" value={String(stats.count)} icon={ReceiptText} iconTone="info" />
         <MetricCard

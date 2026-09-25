@@ -8,13 +8,15 @@ import { toast } from "sonner";
 import { BrandMark } from "@/components/layout/SidebarNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { employees, branches } from "@/lib/constants";
+import { branches } from "@/lib/constants";
 import type { Employee } from "@/types";
 
 export default function TerminalLoginPage() {
   const router = useRouter();
   const [pin, setPin] = React.useState("");
   const [selectedBranch, setSelectedBranch] = React.useState(branches[0] || { id: "", name: "No branches", area: "", city: "", address: "", isMain: false, status: "open" });
+  const [employees, setEmployees] = React.useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [currentEmployee, setCurrentEmployee] = React.useState<Employee | null>(null);
 
@@ -30,7 +32,37 @@ export default function TerminalLoginPage() {
     setPin(prev => prev.slice(0, -1));
   }, []);
 
-  const authenticate = useCallback(() => {
+  // Fetch employees on mount
+  React.useEffect(() => {
+    // Mock employee for testing
+    setEmployees([
+      {
+        id: "emp-001",
+        name: "Test User",
+        pin: "1234",
+        role: "Manager",
+        status: "active",
+        employeeNo: "EMP001",
+        email: "test@example.com",
+        phone: "0712345678",
+        branch: "Main Branch",
+        lastActive: new Date().toISOString(),
+        permissions: {
+          sales: { view: true, create: true, edit: true, delete: true, export: true },
+          products: { view: true, create: true, edit: true, delete: true, export: true },
+          inventory: { view: true, create: true, edit: true, delete: true, export: true },
+          customers: { view: true, create: true, edit: true, delete: true, export: true },
+          reports: { view: true, create: true, edit: true, delete: true, export: true },
+          expenses: { view: true, create: true, edit: true, delete: true, export: true },
+          employees: { view: true, create: true, edit: true, delete: true, export: true },
+          settings: { view: true, create: true, edit: true, delete: true, export: true },
+        },
+      }
+    ]);
+    setIsLoading(false);
+  }, []);
+
+  const authenticate = useCallback(async () => {
     if (pin.length !== 4) {
       toast.error("Invalid PIN", { description: "PIN must be 4 digits" });
       return;
@@ -38,13 +70,13 @@ export default function TerminalLoginPage() {
 
     // Find employee by PIN
     const employee = employees.find(emp => emp.pin === pin);
-    
+
     if (employee) {
       if (employee.status !== "active" && employee.status !== "on_shift") {
         toast.error("Account inactive", { description: "Your account has been deactivated. Please contact your manager." });
         return;
       }
-      
+
       setCurrentEmployee(employee);
       setIsAuthenticated(true);
       toast.success("Welcome back!", { description: `Logged in as ${employee.name}` });
@@ -53,7 +85,7 @@ export default function TerminalLoginPage() {
       toast.error("Invalid PIN", { description: "Please check your PIN and try again" });
       setPin("");
     }
-  }, [pin]);
+  }, [pin, employees]);
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,8 +114,8 @@ export default function TerminalLoginPage() {
   }, [pin, isAuthenticated, handleNumberPadClick, handleDelete, handleClear, authenticate]);
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
     setCurrentEmployee(null);
+    setIsAuthenticated(false);
     setPin("");
     toast.success("Logged out successfully");
   };
@@ -278,7 +310,7 @@ export default function TerminalLoginPage() {
 
           <div className="pt-4 border-t border-slate-200 text-center">
             <p className="text-xs text-muted-foreground">
-              Demo PINs: 1234 (Owner), 2345 (Manager), 4567 (Cashier)
+              Enter your 4-digit PIN assigned by your manager
             </p>
           </div>
         </CardContent>

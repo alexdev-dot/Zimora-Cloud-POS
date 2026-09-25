@@ -19,6 +19,7 @@ import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { StatusBadge, RoleBadge } from "@/components/shared/StatusBadge";
 import { Avatar } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FormField, Input, NativeSelect } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -50,15 +51,18 @@ import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { PERMISSION_ACTIONS, PERMISSION_MODULES, ROLE_PRESETS } from "@/lib/constants";
 import { timeAgo, uid } from "@/lib/utils";
 import { useSimulatedLoading } from "@/lib/hooks";
-import { getEmployees, createEmployee, updateEmployee, updateEmployeeStatus, subscribeToEmployees, unsubscribeFromEmployees } from "@/lib/api/employees";
+import { useEmployeeAuth } from "@/lib/contexts/EmployeeAuthContext";
 import type { Employee, PermissionAction, PermissionModule, Role } from "@/types";
-
-const ROLES: Role[] = ["Owner", "Administrator", "Manager", "Cashier", "Inventory Manager"];
 
 export default function EmployeesPage() {
   const loading = useSimulatedLoading(500);
+  const { login } = useEmployeeAuth();
   const [rows, setRows] = React.useState<Employee[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [roles, setRoles] = React.useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = React.useState(true);
+  const [showAddRoleDialog, setShowAddRoleDialog] = React.useState(false);
+  const [newRoleName, setNewRoleName] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [detail, setDetail] = React.useState<Employee | null>(null);
@@ -67,39 +71,42 @@ export default function EmployeesPage() {
     employee: null,
   });
   const [deactivateTarget, setDeactivateTarget] = React.useState<Employee | null>(null);
-  const subscriptionRef = React.useRef<any>(null);
 
   // Fetch employees on mount
   React.useEffect(() => {
-    async function fetchEmployees() {
-      try {
-        const data = await getEmployees();
-        setRows(data);
-      } catch (error) {
-        console.error('Error fetching employees:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchEmployees();
-
-    // Set up real-time subscription (separate from data fetch to avoid duplicate subscriptions)
-    if (!subscriptionRef.current) {
-      const channel = subscribeToEmployees((updatedEmployees) => {
-        setRows(updatedEmployees);
-      });
-      subscriptionRef.current = channel;
-    }
-
-    // Cleanup subscription on unmount
-    return () => {
-      if (subscriptionRef.current) {
-        unsubscribeFromEmployees(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
+    setRows([]);
+    setIsLoading(false);
   }, []);
+
+  // Fetch roles on mount
+  React.useEffect(() => {
+    setRoles(["Owner", "Manager", "Cashier"]);
+    setRolesLoading(false);
+  }, []);
+
+  // Function to add a new role (only for Owner)
+  function addNewRole() {
+    if (!newRoleName.trim()) return;
+    
+    // Prevent adding Owner role (it's a system role)
+    if (newRoleName.trim().toLowerCase() === 'owner') {
+      toast.error("Cannot add Owner role", { description: "Owner is a system role and cannot be duplicated." });
+      return;
+    }
+
+    // Prevent duplicate roles
+    if (roles.some(r => r.toLowerCase() === newRoleName.trim().toLowerCase())) {
+      toast.error("Role already exists", { description: "A role with this name already exists." });
+      return;
+    }
+
+    // Local operation - update state directly
+    const updatedRoles = [...roles, newRoleName.trim()];
+    setRoles(updatedRoles);
+    setNewRoleName("");
+    setShowAddRoleDialog(false);
+    toast.success("Role added successfully", { description: `${newRoleName.trim()} has been added to available roles.` });
+  }
 
   const filtered = React.useMemo(
     () =>
@@ -121,19 +128,19 @@ export default function EmployeesPage() {
     [rows]
   );
 
-  async function saveEmployee(emp: Employee) {
-    try {
-      if (rows.some((r) => r.id === emp.id)) {
-        await updateEmployee(emp.id, emp);
-      } else {
-        await createEmployee(emp);
+  function saveEmployee(emp: Employee | Omit<Employee, 'id'>) {
+    // Local operation - update state directly
+    const hasId = 'id' in emp && emp.id !== '';
+    
+    if (hasId && rows.some((r) => r.id === emp.id)) {
+      setRows(prev => prev.map(r => r.id === emp.id ? emp as Employee : r));
+    } else {
+      const newEmp = { ...emp, id: uid("e") } as Employee;
+      setRows(prev => [...prev, newEmp]);
+      // If employee has a PIN, automatically log them in so Terminal appears in sidebar
+      if (newEmp.pin) {
+        login(newEmp);
       }
-      // Refresh list
-      const updated = await getEmployees();
-      setRows(updated);
-    } catch (error) {
-      console.error('Failed to save employee:', error);
-      throw error;
     }
   }
 
@@ -208,9 +215,14 @@ export default function EmployeesPage() {
         title="Employees"
         description="Team members, roles and permissions"
         actions={
-          <Button onClick={() => setEditor({ open: true, employee: null })}>
-            <UserPlus /> Add Employee
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowAddRoleDialog(true)}>
+              <ShieldCheck /> Manage Roles
+            </Button>
+            <Button onClick={() => setEditor({ open: true, employee: null })}>
+              <UserPlus /> Add Employee
+            </Button>
+          </div>
         }
       />
 
@@ -239,10 +251,10 @@ export default function EmployeesPage() {
         }
         filters={
           <>
-            <NativeSelect aria-label="Role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-[150px]">
+            <NativeSelect aria-label="Role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-[150px]" disabled={rolesLoading}>
               <option value="all">All roles</option>
-              {ROLES.map((r) => (
-                <option key={r}>{r}</option>
+              {roles.map((r) => (
+                <option key={r}>{r} {r === "Owner" && "(System)"}</option>
               ))}
             </NativeSelect>
             <NativeSelect aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-[140px]">
@@ -356,6 +368,7 @@ export default function EmployeesPage() {
       <EmployeeEditor
         open={editor.open}
         employee={editor.employee}
+        roles={roles}
         onOpenChange={(open) => setEditor({ open, employee: open ? editor.employee : null })}
         onSave={async (emp) => {
           try {
@@ -383,24 +396,64 @@ export default function EmployeesPage() {
         }
         confirmLabel={deactivateTarget?.status === "inactive" ? "Reactivate" : "Deactivate"}
         destructive={deactivateTarget?.status !== "inactive"}
-        onConfirm={async () => {
+        onConfirm={() => {
           if (!deactivateTarget) return;
           const status = deactivateTarget.status === "inactive" ? "active" : "inactive";
-          try {
-            await updateEmployeeStatus(deactivateTarget.id, status);
-            // Refresh list
-            const updated = await getEmployees();
-            setRows(updated);
-            toast.success(status === "inactive" ? "Employee deactivated" : "Employee reactivated", {
-              description: deactivateTarget.name,
-            });
-            setDeactivateTarget(null);
-          } catch (error) {
-            console.error('Failed to update employee status:', error);
-            toast.error("Failed to update employee status");
-          }
+          // Local operation - update state directly
+          setRows(prev => prev.map(r => r.id === deactivateTarget.id ? { ...r, status } : r));
+          toast.success(status === "inactive" ? "Employee deactivated" : "Employee reactivated", {
+            description: deactivateTarget.name,
+          });
+          setDeactivateTarget(null);
         }}
       />
+
+      {/* Role Management Dialog */}
+      <Dialog open={showAddRoleDialog} onOpenChange={setShowAddRoleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Roles</DialogTitle>
+            <DialogDescription>
+              Owner role is always first. Add new roles for your team.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Roles</label>
+              <div className="flex flex-wrap gap-2">
+                {roles.map((role) => (
+                  <Badge key={role} variant={role === "Owner" ? "default" : "outline"} className="text-sm">
+                    {role}
+                    {role === "Owner" && <span className="ml-1 text-xs">(System)</span>}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <FormField label="Add New Role" htmlFor="new-role">
+              <Input
+                id="new-role"
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                placeholder="e.g. Sales Manager"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addNewRole();
+                  }
+                }}
+              />
+            </FormField>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddRoleDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addNewRole} disabled={!newRoleName.trim()}>
+              Add Role
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -459,11 +512,13 @@ function PermissionMatrix({
 function EmployeeEditor({
   open,
   employee,
+  roles,
   onOpenChange,
   onSave,
 }: {
   open: boolean;
   employee: Employee | null;
+  roles: Role[];
   onOpenChange: (o: boolean) => void;
   onSave: (e: Employee) => void;
 }) {
@@ -478,36 +533,51 @@ function EmployeeEditor({
   const [pin, setPin] = React.useState("");
   const [errors, setErrors] = React.useState<{ name?: string; email?: string; pin?: string }>({});
 
+  // Update default role when roles change
+  React.useEffect(() => {
+    if (roles.length > 0 && !employee) {
+      setRole(roles[0]);
+      setPermissions(ROLE_PRESETS[roles[0]] || ROLE_PRESETS.Cashier);
+    }
+  }, [roles, employee]);
+
   React.useEffect(() => {
     if (open) {
+      const defaultRole = roles[0] || "Cashier";
       setName(employee?.name ?? "");
       setEmail(employee?.email ?? "");
       setPhone(employee?.phone ?? "");
-      setRole(employee?.role ?? "Cashier");
+      setRole(employee?.role ?? defaultRole);
       setBranch(employee?.branch ?? "Main Branch");
       setEmployeeNo(employee?.employeeNo ?? `EMP-001`);
       setStatus(employee?.status ?? "active");
-      setPermissions(employee ? structuredClone(employee.permissions) : structuredClone(ROLE_PRESETS.Cashier));
+      const rolePreset = employee?.role ? ROLE_PRESETS[employee.role] : ROLE_PRESETS[defaultRole];
+      setPermissions(employee ? structuredClone(employee.permissions) : structuredClone(rolePreset || ROLE_PRESETS.Cashier));
       setPin(employee?.pin ?? "");
       setErrors({});
     }
-  }, [open, employee]);
+  }, [open, employee, roles]);
 
   function applyRolePreset(next: Role) {
     setRole(next);
-    setPermissions(structuredClone(ROLE_PRESETS[next]));
+    // Use role preset if available, otherwise use cashier permissions as fallback
+    const preset = ROLE_PRESETS[next] || ROLE_PRESETS.Cashier;
+    setPermissions(structuredClone(preset));
   }
 
   function save() {
     const e: { name?: string; email?: string; pin?: string } = {};
     if (!name.trim()) e.name = "Full name is required";
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) e.email = "Enter a valid email address";
+    // Make PIN required for terminal access
+    if (!pin) e.pin = "PIN is required for terminal access";
     if (pin && pin.length !== 4) e.pin = "PIN must be exactly 4 digits";
     if (pin && !/^\d{4}$/.test(pin)) e.pin = "PIN must contain only numbers";
     setErrors(e);
     if (Object.keys(e).length) return;
+    
     onSave({
-      id: employee?.id ?? uid("e"),
+      id: employee?.id ?? "", // Empty string for new employees, API will handle UUID generation
       employeeNo,
       name: name.trim(),
       role,
@@ -542,10 +612,16 @@ function EmployeeEditor({
               <Input id="emp-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XX XXX XXX" />
             </FormField>
             <FormField label="Role" htmlFor="emp-role" hint="Switching roles applies the role's default permissions">
-              <NativeSelect id="emp-role" value={role} onChange={(e) => applyRolePreset(e.target.value as Role)}>
-                {ROLES.map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
+              <NativeSelect id="emp-role" value={role} onChange={(e) => applyRolePreset(e.target.value as Role)} disabled={roles.length === 0}>
+                {roles.length === 0 ? (
+                  <option value="">Loading roles...</option>
+                ) : (
+                  roles.map((r) => (
+                    <option key={r} value={r} disabled={r === "Owner" && !employee}>
+                      {r} {r === "Owner" && "(System)"}
+                    </option>
+                  ))
+                )}
               </NativeSelect>
             </FormField>
             <FormField label="Branch" htmlFor="emp-branch">
@@ -568,7 +644,7 @@ function EmployeeEditor({
                 <option value="inactive">Inactive</option>
               </NativeSelect>
             </FormField>
-            <FormField label="Terminal PIN" htmlFor="emp-pin" hint="4-digit PIN for terminal access (optional)" error={errors.pin}>
+            <FormField label="Terminal PIN" htmlFor="emp-pin" hint="4-digit PIN for terminal access (required)" error={errors.pin} required>
               <Input 
                 id="emp-pin" 
                 type="password" 
